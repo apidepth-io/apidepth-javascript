@@ -18,6 +18,12 @@ let _conflictVendors: Record<string, { local: string; remote: string }> = {};
 let _warnedStale:    Record<string, true>    = {};
 let _warnedConflict: Record<string, true>    = {};
 
+export function resetRegistryLoader(): void {
+  _conflictVendors = {};
+  _warnedStale     = {};
+  _warnedConflict  = {};
+}
+
 export function loadAndStart(): void {
   void _bootstrap();
 

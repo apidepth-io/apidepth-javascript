@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Collector } from '../src/collector.js';
 import { VendorRegistry, BUNDLED_BASELINE } from '../src/vendor_registry.js';
 import { resetConfiguration, getConfiguration } from '../src/configuration.js';
@@ -109,6 +109,48 @@ describe('instrumentation ignored_hosts', () => {
     expect(Collector.getInstance().stats().queueSize).toBe(0);
 
     (https as { request: typeof https.request }).request = originalRequest;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// globalThis.fetch patching
+// ---------------------------------------------------------------------------
+
+describe('instrumentation fetch patching', () => {
+  let savedFetch: typeof globalThis.fetch | undefined;
+
+  beforeEach(() => {
+    savedFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    if (savedFetch !== undefined) {
+      globalThis.fetch = savedFetch;
+    } else {
+      delete (globalThis as unknown as Record<string, unknown>)['fetch'];
+    }
+  });
+
+  it('records an event when fetch succeeds for a known vendor', async () => {
+    getConfiguration().apiKey = 'test-key';
+    const mockResponse = new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
+
+    instrument();
+    await globalThis.fetch('https://api.stripe.com/v1/charges');
+
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+  });
+
+  it('does not record an event for an unrecognised host', async () => {
+    getConfiguration().apiKey = 'test-key';
+    const mockResponse = new Response('{}', { status: 200 });
+    globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
+
+    instrument();
+    await globalThis.fetch('https://api.unknownvendor.test/v1/foo');
+
+    expect(Collector.getInstance().stats().queueSize).toBe(0);
   });
 });
 
