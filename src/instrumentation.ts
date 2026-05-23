@@ -41,6 +41,12 @@ export function instrument(): void {
   _patchFetch();
 }
 
+export function resetInstrumentation(): void {
+  _httpPatched  = false;
+  _httpsPatched = false;
+  _fetchPatched = false;
+}
+
 // ---------------------------------------------------------------------------
 // node:http + node:https
 // ---------------------------------------------------------------------------

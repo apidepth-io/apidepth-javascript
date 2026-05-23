@@ -2,13 +2,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Collector } from '../src/collector.js';
 import { VendorRegistry, BUNDLED_BASELINE } from '../src/vendor_registry.js';
 import { resetConfiguration, getConfiguration } from '../src/configuration.js';
-import { instrument } from '../src/instrumentation.js';
+import { instrument, resetInstrumentation } from '../src/instrumentation.js';
 import https from 'node:https';
 import { EventEmitter } from 'node:events';
 
 beforeEach(() => {
   Collector.reset();
   resetConfiguration();
+  resetInstrumentation();
   VendorRegistry.replace(BUNDLED_BASELINE);
 });
 
@@ -20,6 +21,7 @@ function makeFakeRequest(opts: {
   errorAfterMs?: number;
 }) {
   const req = new EventEmitter() as ReturnType<typeof https.request>;
+  (req as unknown as { end: () => void }).end = () => {};
 
   // Simulate response event after tick
   process.nextTick(() => {
