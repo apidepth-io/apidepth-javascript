@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Collector, validateCollectorUrl, validateApiKey, MAX_QUEUE_SIZE } from '../src/collector.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Collector, validateCollectorUrl, validateApiKey, MAX_QUEUE_SIZE, FAILURE_THRESHOLD } from '../src/collector.js';
 import { resetConfiguration, getConfiguration } from '../src/configuration.js';
+import { setLogger } from '../src/logger.js';
 import type { ApidepthEvent } from '../src/event.js';
+import https from 'node:https';
+import { EventEmitter } from 'node:events';
 
 const makeEvent = (overrides: Partial<ApidepthEvent> = {}): ApidepthEvent => ({
   vendor: 'stripe', endpoint: '/v1/charges', method: 'POST',
@@ -80,5 +83,58 @@ describe('validateApiKey', () => {
 
   it('rejects keys with NUL', () => {
     expect(() => validateApiKey('key\x00injected')).toThrow(/NUL/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Flush failure behaviour
+// ---------------------------------------------------------------------------
+
+function makeFailingRequest(): ReturnType<typeof https.request> {
+  const req = new EventEmitter() as ReturnType<typeof https.request>;
+  (req as unknown as { write: () => void; end: () => void }).write = () => {};
+  (req as unknown as { write: () => void; end: () => void }).end   = () => {};
+  process.nextTick(() => req.emit('error', new Error('connection refused')));
+  return req;
+}
+
+describe('Collector flush failures', () => {
+  let originalRequest: typeof https.request;
+
+  beforeEach(() => {
+    originalRequest = https.request;
+    (https as unknown as { request: typeof https.request }).request =
+      makeFailingRequest as unknown as typeof https.request;
+  });
+
+  afterEach(() => {
+    (https as unknown as { request: typeof https.request }).request = originalRequest;
+    setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+  });
+
+  it('invokes onFlushError with the error and context on failure', async () => {
+    getConfiguration().apiKey = 'test-key';
+    const calls: Array<{ err: Error; ctx: Parameters<NonNullable<typeof getConfiguration>['onFlushError']>[1] }> = [];
+    getConfiguration().onFlushError = (err, ctx) => calls.push({ err, ctx });
+
+    const c = Collector.getInstance();
+    c.record(makeEvent());
+    await c.flush();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].err.message).toMatch(/connection refused/);
+    expect(calls[0].ctx.droppedEvents).toBe(1);
+  });
+
+  it(`increments consecutiveFailures to ${FAILURE_THRESHOLD} after ${FAILURE_THRESHOLD} failures`, async () => {
+    getConfiguration().apiKey = 'test-key';
+
+    const c = Collector.getInstance();
+    for (let i = 0; i < FAILURE_THRESHOLD; i++) {
+      c.record(makeEvent());
+      await c.flush();
+    }
+
+    expect(c.stats().consecutiveFailures).toBe(FAILURE_THRESHOLD);
   });
 });

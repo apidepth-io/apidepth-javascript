@@ -4,6 +4,7 @@ import { VendorRegistry, BUNDLED_BASELINE } from '../src/vendor_registry.js';
 import { resetConfiguration, getConfiguration } from '../src/configuration.js';
 import { instrument, resetInstrumentation } from '../src/instrumentation.js';
 import https from 'node:https';
+import http from 'node:http';
 import { EventEmitter } from 'node:events';
 
 beforeEach(() => {
@@ -26,7 +27,7 @@ function makeFakeRequest(opts: {
   // Simulate response event after tick
   process.nextTick(() => {
     if (opts.errorAfterMs !== undefined) {
-      const err = new Error('socket hang up') as Error & { name: string };
+      const err = new Error('socket timeout') as Error & { name: string };
       err.name = 'TimeoutError';
       req.emit('error', err);
       return;
@@ -167,6 +168,84 @@ describe('instrumentation disabled', () => {
 
     const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
     req.end();
+
+    await new Promise(r => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(0);
+
+    (https as { request: typeof https.request }).request = originalRequest;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// node:http (plain HTTP) patching
+// ---------------------------------------------------------------------------
+
+describe('instrumentation http patching', () => {
+  it('records an event from http.request to a known vendor', async () => {
+    getConfiguration().apiKey = 'test-key';
+    const originalRequest = http.request;
+
+    (http as { request: typeof http.request }).request = vi.fn(() =>
+      makeFakeRequest({ statusCode: 200 }),
+    ) as unknown as typeof http.request;
+
+    instrument();
+
+    const req = http.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
+    req.end();
+
+    await new Promise(r => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+
+    (http as { request: typeof http.request }).request = originalRequest;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Timeout error path
+// ---------------------------------------------------------------------------
+
+describe('instrumentation timeout errors', () => {
+  it('records a timeout outcome when the request emits a TimeoutError', async () => {
+    getConfiguration().apiKey = 'test-key';
+    const originalRequest = https.request;
+
+    (https as { request: typeof https.request }).request = vi.fn(() =>
+      makeFakeRequest({ errorAfterMs: 0 }),
+    ) as unknown as typeof https.request;
+
+    instrument();
+
+    const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
+    req.end();
+
+    await new Promise(r => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+
+    (https as { request: typeof https.request }).request = originalRequest;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sample rate
+// ---------------------------------------------------------------------------
+
+describe('instrumentation sample rate', () => {
+  it('drops all events when sampleRate is 0', async () => {
+    getConfiguration().apiKey = 'test-key';
+    getConfiguration().sampleRate = 0;
+    const originalRequest = https.request;
+
+    (https as { request: typeof https.request }).request = vi.fn(() =>
+      makeFakeRequest({ statusCode: 200 }),
+    ) as unknown as typeof https.request;
+
+    instrument();
+
+    for (let i = 0; i < 5; i++) {
+      const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
+      req.end();
+    }
 
     await new Promise(r => setTimeout(r, 50));
     expect(Collector.getInstance().stats().queueSize).toBe(0);

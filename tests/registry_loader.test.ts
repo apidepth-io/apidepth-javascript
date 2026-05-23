@@ -66,6 +66,8 @@ beforeEach(() => {
   resetRegistryLoader();
   VendorRegistry.replace(BUNDLED_BASELINE);
   originalRequest = https.request;
+  // Prevent disk cache bleed — unique path per test so no test reads another's write
+  getConfiguration().registryCachePath = `/tmp/apidepth_no_cache_${process.pid}_${Date.now()}.json`;
 });
 
 afterEach(() => {
@@ -184,6 +186,54 @@ describe('remote registry fetch', () => {
     await new Promise(r => setTimeout(r, 100));
 
     expect(warns.some(w => /my-api/.test(w) && /conflict/i.test(w))).toBe(true);
+    restore();
+  });
+
+  it('ignores a non-200 response and leaves registry unchanged', async () => {
+    (https as unknown as { request: typeof https.request }).request =
+      mockHttpsSuccess(503, '');
+
+    loadAndStart();
+    await new Promise(r => setTimeout(r, 100));
+
+    // No update from remote — version stays at bundled baseline
+    expect(VendorRegistry.version).toBe('bundled');
+  });
+
+  it('warns and skips when the response body exceeds 512 KB', async () => {
+    const bigChunk = Buffer.alloc(513_000, 'x');
+
+    (https as unknown as { request: typeof https.request }).request = function fakeRequest(
+      ...args: Parameters<typeof https.request>
+    ) {
+      const callback =
+        typeof args[1] === 'function' ? args[1] as (r: unknown) => void
+        : typeof args[2] === 'function' ? args[2] as (r: unknown) => void
+        : undefined;
+
+      const req = new EventEmitter() as ReturnType<typeof https.request>;
+      (req as unknown as { end: () => void; destroy: () => void }).end     = () => {};
+      (req as unknown as { end: () => void; destroy: () => void }).destroy = () => {};
+
+      const res = new EventEmitter() as import('node:http').IncomingMessage;
+      (res as unknown as { statusCode: number }).statusCode = 200;
+      (res as unknown as { resume: () => void; destroy: () => void }).resume  = () => {};
+      (res as unknown as { resume: () => void; destroy: () => void }).destroy = () => {};
+
+      if (callback) req.once('response', callback);
+
+      process.nextTick(() => {
+        req.emit('response', res);
+        process.nextTick(() => res.emit('data', bigChunk));
+      });
+      return req;
+    } as unknown as typeof https.request;
+
+    const { warns, restore } = captureWarns();
+    loadAndStart();
+    await new Promise(r => setTimeout(r, 100));
+
+    expect(warns.some(w => /too large/i.test(w))).toBe(true);
     restore();
   });
 });
