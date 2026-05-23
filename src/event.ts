@@ -19,7 +19,7 @@ export interface ApidepthEvent {
 const REQUIRED = new Set(['vendor', 'endpoint', 'method', 'outcome', 'duration_ms', 'ts']);
 
 export function buildEvent(attrs: ApidepthEvent): ApidepthEvent {
-  const missing = [...REQUIRED].filter(k => !(k in (attrs as Record<string, unknown>)));
+  const missing = [...REQUIRED].filter(k => !(k in (attrs as unknown as Record<string, unknown>)));
   if (missing.length > 0) {
     throw new Error(
       `Apidepth event is missing required fields: ${missing.sort().join(', ')}. ` +

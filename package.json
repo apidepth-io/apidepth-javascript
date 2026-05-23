@@ -7,19 +7,19 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     },
     "./integrations/express": {
+      "types": "./dist/integrations/express.d.ts",
       "import": "./dist/integrations/express.mjs",
-      "require": "./dist/integrations/express.js",
-      "types": "./dist/integrations/express.d.ts"
+      "require": "./dist/integrations/express.js"
     },
     "./integrations/nextjs": {
+      "types": "./dist/integrations/nextjs.d.ts",
       "import": "./dist/integrations/nextjs.mjs",
-      "require": "./dist/integrations/nextjs.js",
-      "types": "./dist/integrations/nextjs.d.ts"
+      "require": "./dist/integrations/nextjs.js"
     }
   },
   "files": ["dist", "README.md", "LICENSE"],

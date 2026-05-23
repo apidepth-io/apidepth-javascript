@@ -29,19 +29,7 @@ export const DEFAULT_URL       = 'https://collector.apidepth.io/v1/events';
 // Matches hostnames that must never be used as a collector endpoint.
 // Canonical test cases live in apidepth-collector/tests/fixtures/private_host_cases.json.
 // All SDK implementations load that fixture and must pass every case.
-const PRIVATE_HOST_RE = /
-  ^localhost$          |
-  ^127\.               |
-  ^0\.0\.0\.0$         |
-  ^0$                  |
-  ^169\.254\.          |
-  ^10\.                |
-  ^172\.(1[6-9]|2\d|3[01])\.  |
-  ^192\.168\.          |
-  ^\[?::1\]?$          |
-  ^\[?f[cd]            |
-  ^\[?fe80:
-/xi;
+const PRIVATE_HOST_RE = /^localhost$|^127\.|^0\.0\.0\.0$|^0$|^169\.254\.|^10\.|^172\.(1[6-9]|2\d|3[01])\.|^192\.168\.|^\[?::1\]?$|^\[?f[cd]|^\[?fe80:/i;
 
 export interface CollectorStats {
   queueSize: number;
