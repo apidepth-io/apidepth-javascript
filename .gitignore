@@ -3,3 +3,5 @@ dist/
 coverage/
 *.tsbuildinfo
 .env
+.DS_Store
+.claude/
