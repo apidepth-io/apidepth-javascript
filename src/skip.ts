@@ -1,4 +1,4 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
+import { AsyncLocalStorage } from "node:async_hooks";
 
 // Recursion guard: prevents the collector's own HTTPS flush from being
 // self-instrumented. Equivalent to Ruby's Thread.current[:apidepth_skip].

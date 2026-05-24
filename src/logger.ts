@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 export interface Logger {
   debug(message: string, ...args: unknown[]): void;
   warn(message: string, ...args: unknown[]): void;
@@ -6,7 +7,7 @@ export interface Logger {
 
 const defaultLogger: Logger = {
   debug: (msg, ...args) => console.debug(msg, ...args),
-  warn:  (msg, ...args) => console.warn(msg, ...args),
+  warn: (msg, ...args) => console.warn(msg, ...args),
   error: (msg, ...args) => console.error(msg, ...args),
 };
 
@@ -21,5 +22,7 @@ export function setLogger(logger: Logger): void {
 }
 
 export function sanitizeLog(s: unknown): string {
-  return String(s).replace(/[\r\n\t]/g, ' ').slice(0, 200);
+  return String(s)
+    .replace(/[\r\n\t]/g, " ")
+    .slice(0, 200);
 }

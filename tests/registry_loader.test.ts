@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import https from 'node:https';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { EventEmitter } from 'node:events';
-import { Collector } from '../src/collector.js';
-import { resetConfiguration, getConfiguration } from '../src/configuration.js';
-import { VendorRegistry, BUNDLED_BASELINE, type RegistryJson } from '../src/vendor_registry.js';
-import { setLogger } from '../src/logger.js';
-import { loadAndStart, resetRegistryLoader } from '../src/registry_loader.js';
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import https from "node:https";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { EventEmitter } from "node:events";
+import { Collector } from "../src/collector.js";
+import { resetConfiguration, getConfiguration } from "../src/configuration.js";
+import { VendorRegistry, BUNDLED_BASELINE, type RegistryJson } from "../src/vendor_registry.js";
+import { setLogger } from "../src/logger.js";
+import { loadAndStart, resetRegistryLoader } from "../src/registry_loader.js";
 
 function captureWarns(): { warns: string[]; restore: () => void } {
   const warns: string[] = [];
@@ -22,25 +22,27 @@ function captureWarns(): { warns: string[]; restore: () => void } {
 function mockHttpsSuccess(statusCode: number, body: string): typeof https.request {
   return function fakeRequest(...args: Parameters<typeof https.request>) {
     const callback =
-      typeof args[1] === 'function' ? args[1] as (r: unknown) => void
-      : typeof args[2] === 'function' ? args[2] as (r: unknown) => void
-      : undefined;
+      typeof args[1] === "function"
+        ? (args[1] as (r: unknown) => void)
+        : typeof args[2] === "function"
+          ? (args[2] as (r: unknown) => void)
+          : undefined;
 
     const req = new EventEmitter() as ReturnType<typeof https.request>;
-    (req as unknown as { end: () => void; destroy: () => void }).end     = () => {};
+    (req as unknown as { end: () => void; destroy: () => void }).end = () => {};
     (req as unknown as { end: () => void; destroy: () => void }).destroy = () => {};
 
-    const res = new EventEmitter() as import('node:http').IncomingMessage;
+    const res = new EventEmitter() as import("node:http").IncomingMessage;
     (res as unknown as { statusCode: number }).statusCode = statusCode;
     (res as unknown as { resume: () => void }).resume = () => {};
 
-    if (callback) req.once('response', callback);
+    if (callback) req.once("response", callback);
 
     process.nextTick(() => {
-      req.emit('response', res);
+      req.emit("response", res);
       process.nextTick(() => {
-        res.emit('data', Buffer.from(body));
-        process.nextTick(() => res.emit('end'));
+        res.emit("data", Buffer.from(body));
+        process.nextTick(() => res.emit("end"));
       });
     });
     return req;
@@ -51,9 +53,9 @@ function mockHttpsSuccess(statusCode: number, body: string): typeof https.reques
 function mockHttpsError(): typeof https.request {
   return function fakeRequest() {
     const req = new EventEmitter() as ReturnType<typeof https.request>;
-    (req as unknown as { end: () => void; destroy: () => void }).end     = () => {};
+    (req as unknown as { end: () => void; destroy: () => void }).end = () => {};
     (req as unknown as { end: () => void; destroy: () => void }).destroy = () => {};
-    process.nextTick(() => req.emit('error', new Error('network unreachable')));
+    process.nextTick(() => req.emit("error", new Error("network unreachable")));
     return req;
   } as unknown as typeof https.request;
 }
@@ -66,6 +68,7 @@ beforeEach(() => {
   resetRegistryLoader();
   VendorRegistry.replace(BUNDLED_BASELINE);
   originalRequest = https.request;
+  getConfiguration().apiKey = "test-key";
   // Prevent disk cache bleed — unique path per test so no test reads another's write
   getConfiguration().registryCachePath = `/tmp/apidepth_no_cache_${process.pid}_${Date.now()}.json`;
 });
@@ -79,28 +82,28 @@ afterEach(() => {
 // Path validation
 // ---------------------------------------------------------------------------
 
-describe('registry cache path validation', () => {
-  it('warns and does not throw for a relative cache path', async () => {
-    getConfiguration().registryCachePath = 'relative/path.json';
+describe("registry cache path validation", () => {
+  it("warns and does not throw for a relative cache path", async () => {
+    getConfiguration().registryCachePath = "relative/path.json";
     (https as unknown as { request: typeof https.request }).request = mockHttpsError();
 
     const { warns, restore } = captureWarns();
     loadAndStart();
-    await new Promise(r => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 60));
 
-    expect(warns.some(w => /absolute path|registry_cache_path/i.test(w))).toBe(true);
+    expect(warns.some((w) => /absolute path|registry_cache_path/i.test(w))).toBe(true);
     restore();
   });
 
-  it('warns and does not throw for a path containing ..', async () => {
-    getConfiguration().registryCachePath = '/tmp/../etc/passwd';
+  it("warns and does not throw for a path containing ..", async () => {
+    getConfiguration().registryCachePath = "/tmp/../etc/passwd";
     (https as unknown as { request: typeof https.request }).request = mockHttpsError();
 
     const { warns, restore } = captureWarns();
     loadAndStart();
-    await new Promise(r => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 60));
 
-    expect(warns.some(w => /traversal|registry_cache_path/i.test(w))).toBe(true);
+    expect(warns.some((w) => /traversal|registry_cache_path/i.test(w))).toBe(true);
     restore();
   });
 });
@@ -109,27 +112,27 @@ describe('registry cache path validation', () => {
 // Disk cache fallback
 // ---------------------------------------------------------------------------
 
-describe('disk cache fallback', () => {
-  it('loads the registry from disk when the remote fetch fails', async () => {
+describe("disk cache fallback", () => {
+  it("loads the registry from disk when the remote fetch fails", async () => {
     const tmpFile = path.join(os.tmpdir(), `apidepth_test_${Date.now()}.json`);
     const diskRegistry: RegistryJson = {
-      version: 'disk-v1',
+      version: "disk-v1",
       vendors: {
         diskvendor: {
-          hosts: ['api.diskvendor.test'],
+          hosts: ["api.diskvendor.test"],
           patterns: [],
         },
       },
     };
-    fs.writeFileSync(tmpFile, JSON.stringify(diskRegistry), 'utf8');
+    fs.writeFileSync(tmpFile, JSON.stringify(diskRegistry), "utf8");
 
     getConfiguration().registryCachePath = tmpFile;
     (https as unknown as { request: typeof https.request }).request = mockHttpsError();
 
     loadAndStart();
-    await new Promise(r => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 60));
 
-    expect(VendorRegistry.version).toBe('disk-v1');
+    expect(VendorRegistry.version).toBe("disk-v1");
 
     fs.unlinkSync(tmpFile);
   });
@@ -139,101 +142,189 @@ describe('disk cache fallback', () => {
 // Remote registry fetch
 // ---------------------------------------------------------------------------
 
-describe('remote registry fetch', () => {
-  it('updates the registry from the remote response', async () => {
+describe("remote registry fetch", () => {
+  it("updates the registry from the remote response", async () => {
     const remoteRegistry: RegistryJson = {
-      version: 'remote-v42',
-      vendors: { remotevendor: { hosts: ['api.remotevendor.test'], patterns: [] } },
+      version: "remote-v42",
+      vendors: { remotevendor: { hosts: ["api.remotevendor.test"], patterns: [] } },
     };
-    (https as unknown as { request: typeof https.request }).request =
-      mockHttpsSuccess(200, JSON.stringify(remoteRegistry));
+    (https as unknown as { request: typeof https.request }).request = mockHttpsSuccess(
+      200,
+      JSON.stringify(remoteRegistry)
+    );
 
     loadAndStart();
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
 
-    expect(VendorRegistry.version).toBe('remote-v42');
+    expect(VendorRegistry.version).toBe("remote-v42");
   });
 
-  it('emits a stale-vendor warning from registry warnings', async () => {
+  it("emits a stale-vendor warning from registry warnings", async () => {
     const remoteRegistry: RegistryJson = {
-      version: 'v1',
+      version: "v1",
       vendors: {},
-      warnings: { stale_vendors: ['old-vendor'] },
+      warnings: { stale_vendors: ["old-vendor"] },
     };
-    (https as unknown as { request: typeof https.request }).request =
-      mockHttpsSuccess(200, JSON.stringify(remoteRegistry));
+    (https as unknown as { request: typeof https.request }).request = mockHttpsSuccess(
+      200,
+      JSON.stringify(remoteRegistry)
+    );
 
     const { warns, restore } = captureWarns();
     loadAndStart();
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
 
-    expect(warns.some(w => /old-vendor/.test(w) && /7\+ days/i.test(w))).toBe(true);
+    expect(warns.some((w) => /old-vendor/.test(w) && /7\+ days/i.test(w))).toBe(true);
     restore();
   });
 
-  it('emits a conflict warning when extraVendors disagrees with the remote', async () => {
-    getConfiguration().extraVendors = { 'my-api': 'local.my-api.com' };
+  it("emits a conflict warning when extraVendors disagrees with the remote", async () => {
+    getConfiguration().extraVendors = { "my-api": "local.my-api.com" };
     const remoteRegistry: RegistryJson = {
-      version: 'v1',
+      version: "v1",
       vendors: {},
-      customer_vendors: { 'my-api': 'remote.my-api.com' },
+      customer_vendors: { "my-api": "remote.my-api.com" },
     };
-    (https as unknown as { request: typeof https.request }).request =
-      mockHttpsSuccess(200, JSON.stringify(remoteRegistry));
+    (https as unknown as { request: typeof https.request }).request = mockHttpsSuccess(
+      200,
+      JSON.stringify(remoteRegistry)
+    );
 
     const { warns, restore } = captureWarns();
     loadAndStart();
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
 
-    expect(warns.some(w => /my-api/.test(w) && /conflict/i.test(w))).toBe(true);
+    expect(warns.some((w) => /my-api/.test(w) && /conflict/i.test(w))).toBe(true);
     restore();
   });
 
-  it('ignores a non-200 response and leaves registry unchanged', async () => {
-    (https as unknown as { request: typeof https.request }).request =
-      mockHttpsSuccess(503, '');
+  it("ignores a non-200 response and leaves registry unchanged", async () => {
+    (https as unknown as { request: typeof https.request }).request = mockHttpsSuccess(503, "");
 
     loadAndStart();
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
 
     // No update from remote — version stays at bundled baseline
-    expect(VendorRegistry.version).toBe('bundled');
+    expect(VendorRegistry.version).toBe("bundled");
   });
 
-  it('warns and skips when the response body exceeds 512 KB', async () => {
-    const bigChunk = Buffer.alloc(513_000, 'x');
+  it("customer_vendors survive VendorRegistry.replace on remote fetch", async () => {
+    const remoteRegistry: RegistryJson = {
+      version: "v-cv",
+      vendors: { other: { hosts: ["api.other.test"], patterns: [] } },
+      customer_vendors: { acme: "api.acme.internal" },
+    };
+    (https as unknown as { request: typeof https.request }).request = mockHttpsSuccess(
+      200,
+      JSON.stringify(remoteRegistry)
+    );
+
+    loadAndStart();
+    await new Promise((r) => setTimeout(r, 100));
+
+    // customer_vendor host must be reachable after replace rebuilt _hosts
+    expect(VendorRegistry.identify("api.acme.internal", "/foo")).toEqual(["acme", "/foo"]);
+  });
+
+  it("emits a conflict warning when loading customer_vendors from disk cache", async () => {
+    const tmpFile = path.join(os.tmpdir(), `apidepth_cv_conflict_${Date.now()}.json`);
+    const diskRegistry: RegistryJson = {
+      version: "disk-conflict",
+      vendors: {},
+      customer_vendors: { "my-api": "remote.my-api.com" },
+    };
+    fs.writeFileSync(tmpFile, JSON.stringify(diskRegistry), "utf8");
+
+    getConfiguration().registryCachePath = tmpFile;
+    getConfiguration().extraVendors = { "my-api": "local.my-api.com" };
+    (https as unknown as { request: typeof https.request }).request = mockHttpsError();
+
+    const { warns, restore } = captureWarns();
+    loadAndStart();
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(warns.some((w) => /my-api/.test(w) && /conflict/i.test(w))).toBe(true);
+    restore();
+    fs.unlinkSync(tmpFile);
+  });
+
+  it("customer_vendors are applied when loading from disk cache", async () => {
+    const tmpFile = path.join(os.tmpdir(), `apidepth_cv_disk_${Date.now()}.json`);
+    const diskRegistry: RegistryJson = {
+      version: "disk-cv",
+      vendors: {},
+      customer_vendors: { "disk-vendor": "api.disk-vendor.internal" },
+    };
+    fs.writeFileSync(tmpFile, JSON.stringify(diskRegistry), "utf8");
+
+    getConfiguration().registryCachePath = tmpFile;
+    (https as unknown as { request: typeof https.request }).request = mockHttpsError();
+
+    loadAndStart();
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(VendorRegistry.identify("api.disk-vendor.internal", "/ping")).toEqual([
+      "disk-vendor",
+      "/ping",
+    ]);
+
+    fs.unlinkSync(tmpFile);
+  });
+
+  it("loadAndStart() is idempotent — calling twice does not create extra timers", async () => {
+    const remoteRegistry: RegistryJson = { version: "idempotent-v1", vendors: {} };
+    let fetchCount = 0;
+    (https as unknown as { request: typeof https.request }).request = function fakeRequest(
+      ...args: Parameters<typeof https.request>
+    ) {
+      fetchCount++;
+      return mockHttpsSuccess(200, JSON.stringify(remoteRegistry))(...args);
+    } as unknown as typeof https.request;
+
+    loadAndStart();
+    loadAndStart(); // second call must be a no-op
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Only one bootstrap fetch should have fired
+    expect(fetchCount).toBe(1);
+  });
+
+  it("warns and skips when the response body exceeds 512 KB", async () => {
+    const bigChunk = Buffer.alloc(513_000, "x");
 
     (https as unknown as { request: typeof https.request }).request = function fakeRequest(
       ...args: Parameters<typeof https.request>
     ) {
       const callback =
-        typeof args[1] === 'function' ? args[1] as (r: unknown) => void
-        : typeof args[2] === 'function' ? args[2] as (r: unknown) => void
-        : undefined;
+        typeof args[1] === "function"
+          ? (args[1] as (r: unknown) => void)
+          : typeof args[2] === "function"
+            ? (args[2] as (r: unknown) => void)
+            : undefined;
 
       const req = new EventEmitter() as ReturnType<typeof https.request>;
-      (req as unknown as { end: () => void; destroy: () => void }).end     = () => {};
+      (req as unknown as { end: () => void; destroy: () => void }).end = () => {};
       (req as unknown as { end: () => void; destroy: () => void }).destroy = () => {};
 
-      const res = new EventEmitter() as import('node:http').IncomingMessage;
+      const res = new EventEmitter() as import("node:http").IncomingMessage;
       (res as unknown as { statusCode: number }).statusCode = 200;
-      (res as unknown as { resume: () => void; destroy: () => void }).resume  = () => {};
+      (res as unknown as { resume: () => void; destroy: () => void }).resume = () => {};
       (res as unknown as { resume: () => void; destroy: () => void }).destroy = () => {};
 
-      if (callback) req.once('response', callback);
+      if (callback) req.once("response", callback);
 
       process.nextTick(() => {
-        req.emit('response', res);
-        process.nextTick(() => res.emit('data', bigChunk));
+        req.emit("response", res);
+        process.nextTick(() => res.emit("data", bigChunk));
       });
       return req;
     } as unknown as typeof https.request;
 
     const { warns, restore } = captureWarns();
     loadAndStart();
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
 
-    expect(warns.some(w => /too large/i.test(w))).toBe(true);
+    expect(warns.some((w) => /too large/i.test(w))).toBe(true);
     restore();
   });
 });

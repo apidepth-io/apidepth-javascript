@@ -1,4 +1,10 @@
-export type Outcome = 'success' | 'client_error' | 'server_error' | 'timeout' | 'unknown';
+export type Outcome =
+  | "success"
+  | "redirect"
+  | "client_error"
+  | "server_error"
+  | "timeout"
+  | "unknown";
 
 export interface ApidepthEvent {
   vendor: string;
@@ -16,14 +22,16 @@ export interface ApidepthEvent {
   rl_reset_at?: number;
 }
 
-const REQUIRED = new Set(['vendor', 'endpoint', 'method', 'outcome', 'duration_ms', 'ts']);
+const REQUIRED = new Set(["vendor", "endpoint", "method", "outcome", "duration_ms", "ts"]);
 
 export function buildEvent(attrs: ApidepthEvent): ApidepthEvent {
-  const missing = [...REQUIRED].filter(k => !(k in (attrs as unknown as Record<string, unknown>)));
+  const missing = [...REQUIRED].filter(
+    (k) => !(k in (attrs as unknown as Record<string, unknown>))
+  );
   if (missing.length > 0) {
     throw new Error(
-      `Apidepth event is missing required fields: ${missing.sort().join(', ')}. ` +
-      'This is a bug in the SDK — please open an issue.',
+      `Apidepth event is missing required fields: ${missing.sort().join(", ")}. ` +
+        "This is a bug in the SDK — please open an issue."
     );
   }
   return { ...attrs };

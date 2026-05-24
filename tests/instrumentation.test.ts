@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Collector } from '../src/collector.js';
-import { VendorRegistry, BUNDLED_BASELINE } from '../src/vendor_registry.js';
-import { resetConfiguration, getConfiguration } from '../src/configuration.js';
-import { instrument, resetInstrumentation } from '../src/instrumentation.js';
-import https from 'node:https';
-import http from 'node:http';
-import { EventEmitter } from 'node:events';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { Collector } from "../src/collector.js";
+import { VendorRegistry, BUNDLED_BASELINE } from "../src/vendor_registry.js";
+import { resetConfiguration, getConfiguration } from "../src/configuration.js";
+import { instrument, resetInstrumentation } from "../src/instrumentation.js";
+import https from "node:https";
+import http from "node:http";
+import { EventEmitter } from "node:events";
 
 beforeEach(() => {
   Collector.reset();
@@ -27,41 +27,41 @@ function makeFakeRequest(opts: {
   // Simulate response event after tick
   process.nextTick(() => {
     if (opts.errorAfterMs !== undefined) {
-      const err = new Error('socket timeout') as Error & { name: string };
-      err.name = 'TimeoutError';
-      req.emit('error', err);
+      const err = new Error("socket timeout") as Error & { name: string };
+      err.name = "TimeoutError";
+      req.emit("error", err);
       return;
     }
     const socket = new EventEmitter() as NodeJS.Socket;
     (socket as unknown as { connecting: boolean }).connecting = opts.socketConnecting ?? false;
-    req.emit('socket', socket);
+    req.emit("socket", socket);
 
-    const res = new EventEmitter() as import('node:http').IncomingMessage;
+    const res = new EventEmitter() as import("node:http").IncomingMessage;
     (res as unknown as { statusCode: number }).statusCode = opts.statusCode ?? 200;
     (res as unknown as { headers: Record<string, string> }).headers = opts.headers ?? {};
-    req.emit('response', res);
+    req.emit("response", res);
   });
 
   return req;
 }
 
-describe('instrumentation cold start tagging', () => {
-  it('records cold_start=true when socket.connecting is true', async () => {
-    getConfiguration().apiKey = 'test-key';
+describe("instrumentation cold start tagging", () => {
+  it("records cold_start=true when socket.connecting is true", async () => {
+    getConfiguration().apiKey = "test-key";
     const originalRequest = https.request;
 
     // Patch https.request to return a fake request with connecting=true
     (https as { request: typeof https.request }).request = vi.fn(() =>
-      makeFakeRequest({ statusCode: 200, socketConnecting: true }),
+      makeFakeRequest({ statusCode: 200, socketConnecting: true })
     ) as unknown as typeof https.request;
 
     instrument();
 
     // Make a fake request to api.stripe.com
-    const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
+    const req = https.request({ hostname: "api.stripe.com", path: "/v1/charges", method: "GET" });
     req.end();
 
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
 
     const stats = Collector.getInstance().stats();
     expect(stats.queueSize).toBe(1);
@@ -70,20 +70,20 @@ describe('instrumentation cold start tagging', () => {
     (https as { request: typeof https.request }).request = originalRequest;
   });
 
-  it('records cold_start=false when socket is reused', async () => {
-    getConfiguration().apiKey = 'test-key';
+  it("records cold_start=false when socket is reused", async () => {
+    getConfiguration().apiKey = "test-key";
     const originalRequest = https.request;
 
     (https as { request: typeof https.request }).request = vi.fn(() =>
-      makeFakeRequest({ statusCode: 200, socketConnecting: false }),
+      makeFakeRequest({ statusCode: 200, socketConnecting: false })
     ) as unknown as typeof https.request;
 
     instrument();
 
-    const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
+    const req = https.request({ hostname: "api.stripe.com", path: "/v1/charges", method: "GET" });
     req.end();
 
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
 
     const stats = Collector.getInstance().stats();
     expect(stats.queueSize).toBe(1);
@@ -92,21 +92,21 @@ describe('instrumentation cold start tagging', () => {
   });
 });
 
-describe('instrumentation ignored_hosts', () => {
-  it('does not record events for ignored hosts', async () => {
-    getConfiguration().ignoredHosts = ['api.stripe.com'];
+describe("instrumentation ignored_hosts", () => {
+  it("does not record events for ignored hosts", async () => {
+    getConfiguration().ignoredHosts = ["api.stripe.com"];
     const originalRequest = https.request;
 
     (https as { request: typeof https.request }).request = vi.fn(() =>
-      makeFakeRequest({ statusCode: 200 }),
+      makeFakeRequest({ statusCode: 200 })
     ) as unknown as typeof https.request;
 
     instrument();
 
-    const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
+    const req = https.request({ hostname: "api.stripe.com", path: "/v1/charges", method: "GET" });
     req.end();
 
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     expect(Collector.getInstance().stats().queueSize).toBe(0);
 
     (https as { request: typeof https.request }).request = originalRequest;
@@ -117,7 +117,7 @@ describe('instrumentation ignored_hosts', () => {
 // globalThis.fetch patching
 // ---------------------------------------------------------------------------
 
-describe('instrumentation fetch patching', () => {
+describe("instrumentation fetch patching", () => {
   let savedFetch: typeof globalThis.fetch | undefined;
 
   beforeEach(() => {
@@ -128,48 +128,51 @@ describe('instrumentation fetch patching', () => {
     if (savedFetch !== undefined) {
       globalThis.fetch = savedFetch;
     } else {
-      delete (globalThis as unknown as Record<string, unknown>)['fetch'];
+      delete (globalThis as unknown as Record<string, unknown>)["fetch"];
     }
   });
 
-  it('records an event when fetch succeeds for a known vendor', async () => {
-    getConfiguration().apiKey = 'test-key';
-    const mockResponse = new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+  it("records an event when fetch succeeds for a known vendor", async () => {
+    getConfiguration().apiKey = "test-key";
+    const mockResponse = new Response("{}", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
     globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
 
     instrument();
-    await globalThis.fetch('https://api.stripe.com/v1/charges');
+    await globalThis.fetch("https://api.stripe.com/v1/charges");
 
     expect(Collector.getInstance().stats().queueSize).toBe(1);
   });
 
-  it('does not record an event for an unrecognised host', async () => {
-    getConfiguration().apiKey = 'test-key';
-    const mockResponse = new Response('{}', { status: 200 });
+  it("does not record an event for an unrecognised host", async () => {
+    getConfiguration().apiKey = "test-key";
+    const mockResponse = new Response("{}", { status: 200 });
     globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
 
     instrument();
-    await globalThis.fetch('https://api.unknownvendor.test/v1/foo');
+    await globalThis.fetch("https://api.unknownvendor.test/v1/foo");
 
     expect(Collector.getInstance().stats().queueSize).toBe(0);
   });
 });
 
-describe('instrumentation disabled', () => {
-  it('does not record events when enabled=false', async () => {
+describe("instrumentation disabled", () => {
+  it("does not record events when enabled=false", async () => {
     getConfiguration().enabled = false;
     const originalRequest = https.request;
 
     (https as { request: typeof https.request }).request = vi.fn(() =>
-      makeFakeRequest({ statusCode: 200 }),
+      makeFakeRequest({ statusCode: 200 })
     ) as unknown as typeof https.request;
 
     instrument();
 
-    const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
+    const req = https.request({ hostname: "api.stripe.com", path: "/v1/charges", method: "GET" });
     req.end();
 
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     expect(Collector.getInstance().stats().queueSize).toBe(0);
 
     (https as { request: typeof https.request }).request = originalRequest;
@@ -180,21 +183,21 @@ describe('instrumentation disabled', () => {
 // node:http (plain HTTP) patching
 // ---------------------------------------------------------------------------
 
-describe('instrumentation http patching', () => {
-  it('records an event from http.request to a known vendor', async () => {
-    getConfiguration().apiKey = 'test-key';
+describe("instrumentation http patching", () => {
+  it("records an event from http.request to a known vendor", async () => {
+    getConfiguration().apiKey = "test-key";
     const originalRequest = http.request;
 
     (http as { request: typeof http.request }).request = vi.fn(() =>
-      makeFakeRequest({ statusCode: 200 }),
+      makeFakeRequest({ statusCode: 200 })
     ) as unknown as typeof http.request;
 
     instrument();
 
-    const req = http.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
+    const req = http.request({ hostname: "api.stripe.com", path: "/v1/charges", method: "GET" });
     req.end();
 
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     expect(Collector.getInstance().stats().queueSize).toBe(1);
 
     (http as { request: typeof http.request }).request = originalRequest;
@@ -205,21 +208,21 @@ describe('instrumentation http patching', () => {
 // Timeout error path
 // ---------------------------------------------------------------------------
 
-describe('instrumentation timeout errors', () => {
-  it('records a timeout outcome when the request emits a TimeoutError', async () => {
-    getConfiguration().apiKey = 'test-key';
+describe("instrumentation timeout errors", () => {
+  it("records a timeout outcome when the request emits a TimeoutError", async () => {
+    getConfiguration().apiKey = "test-key";
     const originalRequest = https.request;
 
     (https as { request: typeof https.request }).request = vi.fn(() =>
-      makeFakeRequest({ errorAfterMs: 0 }),
+      makeFakeRequest({ errorAfterMs: 0 })
     ) as unknown as typeof https.request;
 
     instrument();
 
-    const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
+    const req = https.request({ hostname: "api.stripe.com", path: "/v1/charges", method: "GET" });
     req.end();
 
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     expect(Collector.getInstance().stats().queueSize).toBe(1);
 
     (https as { request: typeof https.request }).request = originalRequest;
@@ -230,24 +233,48 @@ describe('instrumentation timeout errors', () => {
 // Sample rate
 // ---------------------------------------------------------------------------
 
-describe('instrumentation sample rate', () => {
-  it('drops all events when sampleRate is 0', async () => {
-    getConfiguration().apiKey = 'test-key';
+describe("instrumentation URL-instance overload preserves method", () => {
+  it("records the correct method when https.request is called with a URL object", async () => {
+    getConfiguration().apiKey = "test-key";
+    const originalRequest = https.request;
+
+    (https as { request: typeof https.request }).request = vi.fn(() =>
+      makeFakeRequest({ statusCode: 200, socketConnecting: false })
+    ) as unknown as typeof https.request;
+
+    instrument();
+
+    const url = new URL("https://api.stripe.com/v1/charges");
+    const req = https.request(url, { method: "POST" });
+    req.end();
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    // One event recorded — method should not be silently coerced to GET
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+
+    (https as { request: typeof https.request }).request = originalRequest;
+  });
+});
+
+describe("instrumentation sample rate", () => {
+  it("drops all events when sampleRate is 0", async () => {
+    getConfiguration().apiKey = "test-key";
     getConfiguration().sampleRate = 0;
     const originalRequest = https.request;
 
     (https as { request: typeof https.request }).request = vi.fn(() =>
-      makeFakeRequest({ statusCode: 200 }),
+      makeFakeRequest({ statusCode: 200 })
     ) as unknown as typeof https.request;
 
     instrument();
 
     for (let i = 0; i < 5; i++) {
-      const req = https.request({ hostname: 'api.stripe.com', path: '/v1/charges', method: 'GET' });
+      const req = https.request({ hostname: "api.stripe.com", path: "/v1/charges", method: "GET" });
       req.end();
     }
 
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
     expect(Collector.getInstance().stats().queueSize).toBe(0);
 
     (https as { request: typeof https.request }).request = originalRequest;

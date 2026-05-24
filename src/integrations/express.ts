@@ -10,9 +10,9 @@
 //     environment: 'production',
 //   }));
 
-import type { Request, Response, NextFunction, RequestHandler } from 'express';
-import { configure, instrument, getLogger } from '../index.js';
-import type { Configuration } from '../configuration.js';
+import type { Request, Response, NextFunction, RequestHandler } from "express";
+import { configure, instrument, getLogger } from "../index.js";
+import type { Configuration } from "../configuration.js";
 
 export type ExpressOptions = Partial<Configuration>;
 

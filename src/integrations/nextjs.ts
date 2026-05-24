@@ -15,19 +15,19 @@
 // Apidepth only instruments the Node.js runtime — it skips the Edge runtime
 // because edge workers use Web APIs and don't have node:http/https.
 
-import { configure, instrument, getLogger } from '../index.js';
-import type { Configuration } from '../configuration.js';
+import { configure, instrument, getLogger } from "../index.js";
+import type { Configuration } from "../configuration.js";
 
 export type NextjsOptions = Partial<Configuration>;
 
 export async function register(opts: NextjsOptions = {}): Promise<void> {
   // Skip edge runtime — no node:http available there.
-  if (process.env['NEXT_RUNTIME'] === 'edge') return;
+  if (process.env["NEXT_RUNTIME"] === "edge") return;
 
   try {
     configure(opts);
     instrument();
-    getLogger().debug('[Apidepth] Instrumentation active (Next.js Node.js runtime)');
+    getLogger().debug("[Apidepth] Instrumentation active (Next.js Node.js runtime)");
   } catch (e) {
     getLogger().warn(`[Apidepth] Failed to initialize: ${String(e)}`);
   }

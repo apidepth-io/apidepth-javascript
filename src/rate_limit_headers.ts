@@ -17,33 +17,29 @@ export interface RateLimitResult {
 type Headers = Record<string, string | string[] | undefined>;
 
 const REMAINING_HEADERS = [
-  'x-ratelimit-remaining-requests',
-  'x-ratelimit-remaining',
-  'ratelimit-remaining',
+  "x-ratelimit-remaining-requests",
+  "x-ratelimit-remaining",
+  "ratelimit-remaining",
 ];
-const LIMIT_HEADERS = [
-  'x-ratelimit-limit-requests',
-  'x-ratelimit-limit',
-  'ratelimit-limit',
-];
+const LIMIT_HEADERS = ["x-ratelimit-limit-requests", "x-ratelimit-limit", "ratelimit-limit"];
 const RESET_HEADERS = [
-  'x-ratelimit-reset-requests',
-  'x-ratelimit-reset',
-  'ratelimit-reset',
-  'retry-after',
+  "x-ratelimit-reset-requests",
+  "x-ratelimit-reset",
+  "ratelimit-reset",
+  "retry-after",
 ];
 
 export function extractRateLimitHeaders(headers: Headers, nowMs: number): RateLimitResult | null {
   const remaining = findInteger(headers, REMAINING_HEADERS);
-  const limit     = findInteger(headers, LIMIT_HEADERS);
-  const resetAt   = findResetMs(headers, RESET_HEADERS, nowMs);
+  const limit = findInteger(headers, LIMIT_HEADERS);
+  const resetAt = findResetMs(headers, RESET_HEADERS, nowMs);
 
   if (remaining === undefined && limit === undefined && resetAt === undefined) return null;
 
   const result: RateLimitResult = {};
   if (remaining !== undefined) result.rl_remaining = remaining;
-  if (limit     !== undefined) result.rl_limit     = limit;
-  if (resetAt   !== undefined) result.rl_reset_at  = resetAt;
+  if (limit !== undefined) result.rl_limit = limit;
+  if (resetAt !== undefined) result.rl_reset_at = resetAt;
   return result;
 }
 
@@ -92,11 +88,19 @@ function parseDurationMs(str: string): number | undefined {
     found = true;
     const val = parseFloat(m[1]);
     switch (m[2]) {
-      case 'h':  total += Math.round(val * 3_600_000); break;
-      case 'm':  total += Math.round(val * 60_000);    break;
-      case 's':  total += Math.round(val * 1_000);     break;
-      case 'ms': total += Math.round(val);             break;
+      case "h":
+        total += Math.round(val * 3_600_000);
+        break;
+      case "m":
+        total += Math.round(val * 60_000);
+        break;
+      case "s":
+        total += Math.round(val * 1_000);
+        break;
+      case "ms":
+        total += Math.round(val);
+        break;
     }
   }
-  return found && total > 0 ? total : undefined;
+  return found && total >= 0 ? total : undefined;
 }

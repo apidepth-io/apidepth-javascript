@@ -9,7 +9,7 @@ export class Configuration {
   enabled = true;
   flushInterval = 20;
   registryRefreshInterval = 6 * 60 * 60;
-  registryCachePath = '/tmp/apidepth_registry.json';
+  registryCachePath = "/tmp/apidepth_registry.json";
   ignoredHosts: string[] = [];
   onFlushError: FlushErrorCallback | null = null;
   environment: string | null = null;

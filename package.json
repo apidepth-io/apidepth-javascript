@@ -22,8 +22,14 @@
       "require": "./dist/integrations/nextjs.js"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "sideEffects": true,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "prebuild": "node -e \"const v=require('./package.json').version;require('fs').writeFileSync('src/version.ts','export const VERSION = '+JSON.stringify(v)+';\\n')\"",
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -36,16 +42,29 @@
     "express": ">=4.0.0"
   },
   "peerDependenciesMeta": {
-    "express": { "optional": true }
+    "express": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.4",
+    "@typescript-eslint/parser": "^8.59.4",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   },
-  "keywords": ["api", "monitoring", "observability", "latency", "rate-limit"],
+  "keywords": [
+    "api",
+    "monitoring",
+    "observability",
+    "latency",
+    "rate-limit"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
