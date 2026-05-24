@@ -16,7 +16,7 @@ No payload capture. No credentials touch our infrastructure. No changes to your 
 
 **Fleet benchmarking.** Because Apidepth aggregates anonymized timing data across all customers, your dashboard shows not just "your Stripe p95 is 420ms" but "the fleet median is 280ms — you may have a regional routing issue." That comparison is only possible with real traffic from real deployments.
 
-**Proof of Innocence.** When all endpoints to a vendor spike simultaneously, Apidepth surfaces a verdict: *isolated* (the spike is yours alone) or *tracking* (the fleet sees the same thing — vendor-side). The attribution card makes it fast to tell ops "it's Stripe, not us."
+**Proof of Innocence.** When all endpoints to a vendor spike simultaneously, Apidepth surfaces a verdict: _isolated_ (the spike is yours alone) or _tracking_ (the fleet sees the same thing — vendor-side). The attribution card makes it fast to tell ops "it's Stripe, not us."
 
 **Rate limit intelligence.** Apidepth tracks 429 patterns and projects quota burn-down before you hit the ceiling — with a burn-down card showing time-to-throttle at current request rate.
 
@@ -33,10 +33,10 @@ npm install apidepth
 ## Quick start
 
 ```ts
-import Apidepth from 'apidepth';
+import Apidepth from "apidepth";
 
 Apidepth.configure({
-  apiKey:      process.env.APIDEPTH_API_KEY,
+  apiKey: process.env.APIDEPTH_API_KEY,
   environment: process.env.NODE_ENV,
 });
 Apidepth.instrument();
@@ -53,15 +53,17 @@ Get your API key at [apidepth.io](https://apidepth.io).
 ### Express
 
 ```ts
-import express from 'express';
-import { apidepthMiddleware } from 'apidepth/integrations/express';
+import express from "express";
+import { apidepthMiddleware } from "apidepth/integrations/express";
 
 const app = express();
 
-app.use(apidepthMiddleware({
-  apiKey:      process.env.APIDEPTH_API_KEY,
-  environment: process.env.NODE_ENV,
-}));
+app.use(
+  apidepthMiddleware({
+    apiKey: process.env.APIDEPTH_API_KEY,
+    environment: process.env.NODE_ENV,
+  })
+);
 ```
 
 The middleware configures and instruments on first mount, then calls `next()` on every request — it adds no per-request overhead.
@@ -71,11 +73,11 @@ The middleware configures and instruments on first mount, then calls `next()` on
 Create or add to `src/instrumentation.ts` in your Next.js app:
 
 ```ts
-import { register as apidepthRegister } from 'apidepth/integrations/nextjs';
+import { register as apidepthRegister } from "apidepth/integrations/nextjs";
 
 export async function register() {
   await apidepthRegister({
-    apiKey:      process.env.APIDEPTH_API_KEY,
+    apiKey: process.env.APIDEPTH_API_KEY,
     environment: process.env.NODE_ENV,
   });
 }
@@ -105,7 +107,7 @@ Apidepth.configure({
 
   // Tag applied to every event. Use this to distinguish environments
   // in your dashboard. Default: null
-  environment: 'production',
+  environment: "production",
 
   // Set false to disable all instrumentation (e.g. in test environments).
   // Default: true
@@ -118,7 +120,7 @@ Apidepth.configure({
 
   // Hostnames to exclude from instrumentation entirely.
   // Default: []
-  ignoredHosts: ['api.internal.mycompany.com'],
+  ignoredHosts: ["api.internal.mycompany.com"],
 
   // How often (in seconds) queued events are batched and sent.
   // Default: 20
@@ -126,7 +128,7 @@ Apidepth.configure({
 
   // Path for the local vendor registry cache.
   // Default: '/tmp/apidepth_registry.json'
-  registryCachePath: '/tmp/apidepth_registry.json',
+  registryCachePath: "/tmp/apidepth_registry.json",
 
   // Custom vendors your app calls that aren't in the global registry.
   // Key: vendor name shown in your dashboard.
@@ -134,8 +136,8 @@ Apidepth.configure({
   // Mappings sync to your dashboard on the next event flush.
   // Default: {}
   extraVendors: {
-    'my-payments-api': 'api.payments.internal.com',
-    'fulfillment':     'fulfillment.myco.io',
+    "my-payments-api": "api.payments.internal.com",
+    fulfillment: "fulfillment.myco.io",
   },
 
   // Called on every flush failure, in addition to the built-in warn log.
@@ -147,7 +149,7 @@ Apidepth.configure({
 
   // Override the collector endpoint. Only useful for self-hosted deployments.
   // Default: 'https://collector.apidepth.io/v1/events'
-  collectorUrl: 'https://collector.apidepth.io/v1/events',
+  collectorUrl: "https://collector.apidepth.io/v1/events",
 });
 ```
 
@@ -157,17 +159,17 @@ Apidepth.configure({
 
 Every event contains:
 
-| Field | Description |
-|-------|-------------|
-| `vendor` | Vendor slug, e.g. `"stripe"`, `"openai"` |
-| `endpoint` | Normalized path, e.g. `"/v1/charges/:id"` |
-| `method` | HTTP verb: `"GET"`, `"POST"`, etc. |
-| `status` | HTTP status code, or `null` on timeout |
-| `outcome` | `"success"`, `"client_error"`, `"server_error"`, `"timeout"`, `"unknown"` |
-| `duration_ms` | Wall-clock time in milliseconds, including DNS and TLS on first connection |
-| `cold_start` | `true` if this request paid for the TLS handshake; excluded from p95 calculations |
-| `env` | Environment tag from `environment` config option |
-| `ts` | Unix timestamp in milliseconds |
+| Field         | Description                                                                       |
+| ------------- | --------------------------------------------------------------------------------- |
+| `vendor`      | Vendor slug, e.g. `"stripe"`, `"openai"`                                          |
+| `endpoint`    | Normalized path, e.g. `"/v1/charges/:id"`                                         |
+| `method`      | HTTP verb: `"GET"`, `"POST"`, etc.                                                |
+| `status`      | HTTP status code, or `null` on timeout                                            |
+| `outcome`     | `"success"`, `"client_error"`, `"server_error"`, `"timeout"`, `"unknown"`         |
+| `duration_ms` | Wall-clock time in milliseconds, including DNS and TLS on first connection        |
+| `cold_start`  | `true` if this request paid for the TLS handshake; excluded from p95 calculations |
+| `env`         | Environment tag from `environment` config option                                  |
+| `ts`          | Unix timestamp in milliseconds                                                    |
 
 ### What is never captured
 
@@ -185,13 +187,14 @@ Path normalization strips resource IDs before the event leaves your server. `/v1
 
 Apidepth automatically reads vendor rate-limit headers on every response. No configuration required. The following header names are checked in priority order:
 
-| Field | Headers checked |
-|-------|----------------|
-| remaining | `x-ratelimit-remaining-requests`, `x-ratelimit-remaining`, `ratelimit-remaining` |
-| limit | `x-ratelimit-limit-requests`, `x-ratelimit-limit`, `ratelimit-limit` |
-| reset_at | `x-ratelimit-reset-requests`, `x-ratelimit-reset`, `ratelimit-reset`, `retry-after` |
+| Field     | Headers checked                                                                     |
+| --------- | ----------------------------------------------------------------------------------- |
+| remaining | `x-ratelimit-remaining-requests`, `x-ratelimit-remaining`, `ratelimit-remaining`    |
+| limit     | `x-ratelimit-limit-requests`, `x-ratelimit-limit`, `ratelimit-limit`                |
+| reset_at  | `x-ratelimit-reset-requests`, `x-ratelimit-reset`, `ratelimit-reset`, `retry-after` |
 
 The `reset_at` value is normalized to epoch milliseconds regardless of vendor format:
+
 - **Unix timestamp** (`n ≥ 1 × 10⁹`) — GitHub, HubSpot, IETF draft
 - **Seconds from now** (small integer) — Stripe `Retry-After` on 429
 - **Duration string** (`"1s"`, `"20ms"`, `"1m30s"`) — OpenAI, Anthropic
@@ -206,8 +209,8 @@ Each worker process needs its own collector instance. Call `Apidepth.reset()` in
 
 ```ts
 // cluster setup
-cluster.on('fork', (worker) => {
-  worker.once('online', () => {
+cluster.on("fork", (worker) => {
+  worker.once("online", () => {
     // workers run this in their own process
   });
 });
@@ -221,7 +224,7 @@ Apidepth.instrument();
 To flush the primary process queue before forking:
 
 ```ts
-import { Collector } from 'apidepth';
+import { Collector } from "apidepth";
 
 // before fork
 await Collector.getInstance().flush();
@@ -237,7 +240,7 @@ Apidepth.reset();
 Inspect the collector's internal state at any time:
 
 ```ts
-import { Collector } from 'apidepth';
+import { Collector } from "apidepth";
 
 console.log(Collector.getInstance().stats());
 // {
@@ -257,8 +260,8 @@ To enable debug-level logging:
 ```ts
 Apidepth.setLogger({
   debug: (msg) => console.debug(msg),
-  info:  (msg) => console.info(msg),
-  warn:  (msg) => console.warn(msg),
+  info: (msg) => console.info(msg),
+  warn: (msg) => console.warn(msg),
   error: (msg) => console.error(msg),
 });
 ```
@@ -273,9 +276,9 @@ Apidepth.setLogger({ debug: () => {}, info: () => {}, warn: () => {}, error: () 
 
 ## Compatibility
 
-| | Minimum |
-|-|---------|
-| Node.js | 18 |
+|            | Minimum        |
+| ---------- | -------------- |
+| Node.js    | 18             |
 | TypeScript | 5.0 (optional) |
 
 The SDK instruments `node:http` and `node:https` at the module level. Most HTTP clients in the Node.js ecosystem (`axios`, `got`, `node-fetch`, `undici` in Node.js ≥ 18 via `fetch`) make requests through these modules and are instrumented automatically without additional configuration.
@@ -287,7 +290,7 @@ The SDK instruments `node:http` and `node:https` at the module level. Most HTTP 
 ## Contributing
 
 ```
-git clone https://github.com/cmwright33/apidepth-javascript
+git clone https://github.com/apidepth-io/apidepth-javascript
 cd apidepth-javascript
 npm install
 npm test
