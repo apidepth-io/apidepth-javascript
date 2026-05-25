@@ -10,18 +10,19 @@ This repo uses **release-please** for automated releases. Merging to `main` is h
 
 PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/). The title becomes the squash-merge commit message, which release-please reads to determine the next version:
 
-| Title prefix | Version bump |
-|---|---|
-| `feat: ...` | minor (1.x.0) |
-| `fix: ...` | patch (1.0.x) |
-| `feat!:` or `BREAKING CHANGE` in body | major (x.0.0) |
-| `chore:`, `docs:`, `refactor:`, `test:` | none |
+| Title prefix                            | Version bump  |
+| --------------------------------------- | ------------- |
+| `feat: ...`                             | minor (1.x.0) |
+| `fix: ...`                              | patch (1.0.x) |
+| `feat!:` or `BREAKING CHANGE` in body   | major (x.0.0) |
+| `chore:`, `docs:`, `refactor:`, `test:` | none          |
 
 A PR whose title doesn't match this format is blocked by the `PR Title` required status check.
 
 ### Step 2 — merge the release PR
 
 After step 1, release-please opens a `chore: release X.Y.Z` PR automatically. That PR:
+
 - bumps the version in `package.json`
 - updates `CHANGELOG.md`
 
@@ -45,8 +46,8 @@ The single CI job (`.github/workflows/ci.yml`) runs TypeScript type checking, Vi
 
 ## GitHub Actions secrets
 
-| Secret | Used for |
-|---|---|
+| Secret      | Used for                                         |
+| ----------- | ------------------------------------------------ |
 | `NPM_TOKEN` | Publishing the package to npm (automation token) |
 
 See `CONTRIBUTING.md` for the full contributor guide.

@@ -1,0 +1,5 @@
+[allowlist]
+description = "Test fixtures"
+paths = [
+  "tests/configuration.test.ts",
+]

@@ -47,12 +47,12 @@ Releases are fully automated via [release-please](https://github.com/googleapis/
 
 ### Version semantics
 
-| Commit type | Version bump |
-|---|---|
-| `feat:` | minor |
-| `fix:` | patch |
-| `feat!:` or `BREAKING CHANGE` in body | major |
-| `chore:`, `docs:`, `refactor:`, `test:` | no release |
+| Commit type                             | Version bump |
+| --------------------------------------- | ------------ |
+| `feat:`                                 | minor        |
+| `fix:`                                  | patch        |
+| `feat!:` or `BREAKING CHANGE` in body   | major        |
+| `chore:`, `docs:`, `refactor:`, `test:` | no release   |
 
 ### Do not edit `package.json` version manually
 
@@ -64,6 +64,6 @@ The single CI job runs TypeScript type checking, Vitest unit tests, and a full b
 
 ## Secrets (maintainers only)
 
-| Secret | Where to get it |
-|---|---|
+| Secret      | Where to get it                                             |
+| ----------- | ----------------------------------------------------------- |
 | `NPM_TOKEN` | npmjs.com → Access Tokens → Generate New Token → Automation |
