@@ -109,3 +109,46 @@ describe("VendorRegistry unsafe pattern guard", () => {
     expect(VendorRegistry.identify("bad.example.com", "/anything")).toEqual(["bad", "/anything"]);
   });
 });
+
+describe("VendorRegistry.loadExtraVendors edge cases", () => {
+  it("is a no-op when called with null", () => {
+    // Covers the `if (!extra) return` early-exit branch.
+    expect(() => VendorRegistry.loadExtraVendors(null)).not.toThrow();
+  });
+
+  it("is a no-op when called with undefined", () => {
+    expect(() => VendorRegistry.loadExtraVendors(undefined)).not.toThrow();
+  });
+});
+
+describe("VendorRegistry.replace version fallback", () => {
+  it("uses 'unknown' when the registry has no version field", () => {
+    VendorRegistry.replace({
+      vendors: { noversion: { hosts: ["noversion.example.com"], patterns: [] } },
+    } as unknown as import("../src/vendor_registry.js").RegistryJson);
+    expect(VendorRegistry.version).toBe("unknown");
+  });
+});
+
+describe("VendorRegistry invalid regex guard", () => {
+  it("skips syntactically invalid regex patterns without throwing", () => {
+    // "[" is not caught by the unsafe-pattern guard but throws in new RegExp().
+    // The catch block should swallow it and continue so the host is still usable.
+    expect(() =>
+      VendorRegistry.replace({
+        version: "invalid-re-test",
+        vendors: {
+          myvend: {
+            hosts: ["api.myvend.io"],
+            patterns: [{ match: "[", replace: "/broken" }],
+          },
+        },
+      })
+    ).not.toThrow();
+    // Host registered but bad pattern skipped — path falls back to generic normalizers
+    expect(VendorRegistry.identify("api.myvend.io", "/some/path")).toEqual([
+      "myvend",
+      "/some/path",
+    ]);
+  });
+});

@@ -3,6 +3,7 @@ import {
   Collector,
   validateCollectorUrl,
   validateApiKey,
+  sdkMetadata,
   MAX_QUEUE_SIZE,
   MAX_BATCH_SIZE,
   FAILURE_THRESHOLD,
@@ -81,6 +82,30 @@ describe("validateCollectorUrl", () => {
   ];
   it.each(privateHosts)("rejects private host %s", (url) => {
     expect(() => validateCollectorUrl(new URL(url))).toThrow(/private|loopback|link-local/i);
+  });
+
+  it("rejects decimal-encoded loopback (SSRF via integer IP notation)", () => {
+    // 2130706433 == 127.0.0.1 in decimal
+    expect(() => validateCollectorUrl(new URL("https://2130706433/v1/events"))).toThrow(
+      /private|loopback|link-local/i
+    );
+  });
+});
+
+describe("sdkMetadata", () => {
+  it("returns an object with expected keys", () => {
+    const meta = sdkMetadata();
+    expect(meta).toMatchObject({
+      name: "apidepth-javascript",
+      node_version: expect.any(String),
+      node_platform: expect.any(String),
+    });
+  });
+
+  it("returns a fresh copy each call (not the internal object)", () => {
+    const a = sdkMetadata();
+    const b = sdkMetadata();
+    expect(a).not.toBe(b);
   });
 });
 
