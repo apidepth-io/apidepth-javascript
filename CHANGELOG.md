@@ -18,6 +18,7 @@ Initial release.
 ### Added
 
 **Core instrumentation**
+
 - Passive outbound HTTP capture via monkey-patching `node:http` and `node:https` — instruments axios, node-fetch v2, got, and anything backed by Node's built-in HTTP stack with a single hook
 - Native `fetch` instrumentation via `globalThis.fetch` patching — covers Node 18+ built-in fetch, undici, and node-fetch v3 without separate configuration
 - Per-event tagging: vendor slug, normalized endpoint path, HTTP method, status code, outcome (`success`, `client_error`, `server_error`, `timeout`, `unknown`), duration in milliseconds, cold-start flag, environment, millisecond-resolution Unix timestamp
@@ -26,6 +27,7 @@ Initial release.
 - Sample rate support — `sampleRate` (0.0–1.0) for high-traffic applications
 
 **Vendor registry**
+
 - Bundled baseline covering Stripe, OpenAI, Anthropic, Twilio, Resend, GitHub
 - Remote registry hot-swap — vendor patterns fetched from Apidepth servers every 6 hours, applied without package update or process restart
 - Three-tier fallback: remote fetch → disk cache → bundled baseline
@@ -34,6 +36,7 @@ Initial release.
 - `extraVendors` config for local vendor patterns not yet in the remote registry
 
 **Collector**
+
 - Background flush interval batching events every 20 seconds (configurable via `flushInterval`)
 - Persistent HTTPS keep-alive connection to the collector — single SSL handshake per process lifetime, not per flush
 - Backpressure — events silently dropped when queue exceeds capacity; `totalDropped` counter tracks discards
@@ -41,19 +44,23 @@ Initial release.
 - `enabled` flag — set to `false` to disable instrumentation entirely without code changes (e.g. for test environments)
 
 **Rate limit tracking**
+
 - `extractRateLimitHeaders()` — parses `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After`, and vendor-specific variants from response headers into a structured object
 - Rate limit metadata attached to events when headers are present
 
 **Framework integrations**
+
 - **Express** — `apidepthMiddleware(opts)` wires configuration and instrumentation in a single `app.use()` call; the middleware itself is a no-op passthrough (outbound instrumentation is handled by the HTTP patches)
 - **Next.js** — `register(opts)` for use in `src/instrumentation.ts`; automatically skips the Edge runtime (which has no `node:http`) and instruments only the Node.js runtime
 
 **TypeScript**
+
 - Full TypeScript source with strict mode; compiled to both ESM and CJS via tsup
 - Exported types: `Configuration`, `FlushErrorCallback`, `ExpressOptions`, `NextjsOptions`
 - `configure()`, `instrument()`, `getLogger()` top-level exports for manual integration
 
 **Security**
+
 - SSRF protection — `collectorUrl` must use HTTPS; private IP ranges, loopback, and link-local addresses are rejected
 - HTTP header injection guard — CRLF in `apiKey` raises before the Authorization header is set
 - Registry response size limit — responses over 512 KB are rejected before parsing
@@ -61,6 +68,7 @@ Initial release.
 - ReDoS protection — registry-sourced patterns are validated and rejected if they match known catastrophic backtracking structures
 
 **Testing**
+
 - 97 Vitest tests covering unit, integration, and security behavior across all modules
 - Tests run without a live network — all HTTP calls are intercepted via test doubles
 - Test suite runnable with `npm test` after `npm ci`
