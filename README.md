@@ -30,7 +30,7 @@ npm install apidepth
 
 ---
 
-## Quick start
+## Getting started
 
 ```ts
 import Apidepth from "apidepth";
@@ -170,6 +170,9 @@ Every event contains:
 | `cold_start`  | `true` if this request paid for the TLS handshake; excluded from p95 calculations |
 | `env`         | Environment tag from `environment` config option                                  |
 | `ts`          | Unix timestamp in milliseconds                                                    |
+| `rl_remaining` | Remaining quota, e.g. `4999` — present when vendor rate limit headers are found  |
+| `rl_limit`    | Total quota, e.g. `5000` — present when vendor rate limit headers are found       |
+| `rl_reset_at` | Quota reset time in epoch milliseconds — present when vendor rate limit headers are found |
 
 ### What is never captured
 
