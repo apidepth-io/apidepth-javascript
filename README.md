@@ -30,7 +30,7 @@ npm install apidepth
 
 ---
 
-## Quick start
+## Getting started
 
 ```ts
 import Apidepth from "apidepth";
@@ -159,17 +159,20 @@ Apidepth.configure({
 
 Every event contains:
 
-| Field         | Description                                                                       |
-| ------------- | --------------------------------------------------------------------------------- |
-| `vendor`      | Vendor slug, e.g. `"stripe"`, `"openai"`                                          |
-| `endpoint`    | Normalized path, e.g. `"/v1/charges/:id"`                                         |
-| `method`      | HTTP verb: `"GET"`, `"POST"`, etc.                                                |
-| `status`      | HTTP status code, or `null` on timeout                                            |
-| `outcome`     | `"success"`, `"client_error"`, `"server_error"`, `"timeout"`, `"unknown"`         |
-| `duration_ms` | Wall-clock time in milliseconds, including DNS and TLS on first connection        |
-| `cold_start`  | `true` if this request paid for the TLS handshake; excluded from p95 calculations |
-| `env`         | Environment tag from `environment` config option                                  |
-| `ts`          | Unix timestamp in milliseconds                                                    |
+| Field          | Description                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| `vendor`       | Vendor slug, e.g. `"stripe"`, `"openai"`                                                  |
+| `endpoint`     | Normalized path, e.g. `"/v1/charges/:id"`                                                 |
+| `method`       | HTTP verb: `"GET"`, `"POST"`, etc.                                                        |
+| `status`       | HTTP status code, or `null` on timeout                                                    |
+| `outcome`      | `"success"`, `"client_error"`, `"server_error"`, `"timeout"`, `"unknown"`                 |
+| `duration_ms`  | Wall-clock time in milliseconds, including DNS and TLS on first connection                |
+| `cold_start`   | `true` if this request paid for the TLS handshake; excluded from p95 calculations         |
+| `env`          | Environment tag from `environment` config option                                          |
+| `ts`           | Unix timestamp in milliseconds                                                            |
+| `rl_remaining` | Remaining quota, e.g. `4999` — present when vendor rate limit headers are found           |
+| `rl_limit`     | Total quota, e.g. `5000` — present when vendor rate limit headers are found               |
+| `rl_reset_at`  | Quota reset time in epoch milliseconds — present when vendor rate limit headers are found |
 
 ### What is never captured
 
