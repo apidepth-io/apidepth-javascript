@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.1.1](https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.1.0...apidepth-v0.1.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* gitleaks allowlist for test fixture key, prettier CLAUDE.md and CONTRIBUTING.md ([3e98c64](https://github.com/apidepth-io/apidepth-javascript/commit/3e98c64c40b82d070b264a7da44d71020febb317))
+
 ## [Unreleased]
 
 ---

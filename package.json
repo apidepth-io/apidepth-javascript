@@ -1,6 +1,6 @@
 {
   "name": "apidepth",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Track outbound API latency, error rates, and rate-limit quota across third-party vendors",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
