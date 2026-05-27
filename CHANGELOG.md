@@ -7,7 +7,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## [Unreleased]
+## [0.1.1](https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.1.0...apidepth-v0.1.1) (2026-05-27)
+
+### Bug Fixes
+
+- gitleaks allowlist for test fixture key, prettier CLAUDE.md and CONTRIBUTING.md ([3e98c64](https://github.com/apidepth-io/apidepth-javascript/commit/3e98c64c40b82d070b264a7da44d71020febb317))
 
 ---
 
@@ -69,7 +73,7 @@ Initial release.
 
 **Testing**
 
-- 97 Vitest tests covering unit, integration, and security behavior across all modules
+- 112 Vitest tests covering unit, integration, and security behavior across all modules
 - Tests run without a live network — all HTTP calls are intercepted via test doubles
 - Test suite runnable with `npm test` after `npm ci`
 
@@ -81,5 +85,6 @@ Initial release.
 
 ---
 
-[Unreleased]: https://github.com/cmwright33/apidepth-javascript/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/cmwright33/apidepth-javascript/releases/tag/v0.1.0
+[Unreleased]: https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.1.1...HEAD
+[0.1.1]: https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.1.0...apidepth-v0.1.1
+[0.1.0]: https://github.com/apidepth-io/apidepth-javascript/releases/tag/apidepth-v0.1.0
