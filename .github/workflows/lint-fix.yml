@@ -1,0 +1,15 @@
+name: Lint Fix
+
+# Runs ESLint --fix and prettier --write on every PR and commits corrections
+# back to the PR branch. The existing lint.yml check workflow re-runs after
+# the commit and will fail if any issues remain that cannot be auto-fixed.
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-fix:
+    uses: apidepth-io/apidepth-tooling/.github/workflows/lint-fix-javascript.yml@main
+    permissions:
+      contents: write
