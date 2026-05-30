@@ -114,13 +114,13 @@ For CI/CD pipelines, skip all prompts:
 npx apidepth setup --api-key $APIDEPTH_API_KEY --no-prompt
 ```
 
-| Flag | Description |
-|---|---|
-| `--api-key <key>` | Inject your API key into the generated snippet. |
-| `--no-prompt` | Non-interactive mode — print snippet to stdout and exit. |
-| `--framework <name>` | Override auto-detection (`express`, `nextjs`, `generic`). |
+| Flag                         | Description                                                                        |
+| ---------------------------- | ---------------------------------------------------------------------------------- |
+| `--api-key <key>`            | Inject your API key into the generated snippet.                                    |
+| `--no-prompt`                | Non-interactive mode — print snippet to stdout and exit.                           |
+| `--framework <name>`         | Override auto-detection (`express`, `nextjs`, `generic`).                          |
 | `--ignored-hosts <patterns>` | Comma-separated host patterns to add to `ignoredHosts` (glob wildcards supported). |
-| `--collector-url <url>` | Override the collector URL in the generated snippet. |
+| `--collector-url <url>`      | Override the collector URL in the generated snippet.                               |
 
 ### `npx apidepth test`
 
