@@ -9,10 +9,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.2.0](https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.1.1...apidepth-v0.2.0) (2026-05-30)
 
-
 ### Features
 
-* onboarding cluster — setup/test CLI, smart ignored host defaults, framework detection ([#8](https://github.com/apidepth-io/apidepth-javascript/issues/8)) ([c3b4823](https://github.com/apidepth-io/apidepth-javascript/commit/c3b482355b451c25ad7244bb4be2f1e25ff4203c))
+- onboarding cluster — setup/test CLI, smart ignored host defaults, framework detection ([#8](https://github.com/apidepth-io/apidepth-javascript/issues/8)) ([c3b4823](https://github.com/apidepth-io/apidepth-javascript/commit/c3b482355b451c25ad7244bb4be2f1e25ff4203c))
 
 ## [0.1.1](https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.1.0...apidepth-v0.1.1) (2026-05-27)
 
