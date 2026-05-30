@@ -12,8 +12,8 @@ const TIMEOUT_MS = 5_000;
 
 let sdkVersion = "unknown";
 try {
-  // Resolved at compile time via the prebuild script
-  ({ VERSION: sdkVersion } = await import("../version.js"));
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  ({ VERSION: sdkVersion } = require("../version.js"));
 } catch {
   // ignore — version is cosmetic in the test payload
 }
