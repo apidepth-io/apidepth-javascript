@@ -57,8 +57,12 @@ export async function runSetup(argv: string[]): Promise<void> {
       for (const h of ["localhost", "127.0.0.1", "0.0.0.0", "::1"]) {
         process.stdout.write(`  • ${h}\n`);
       }
-      process.stdout.write(`  • ${collectorUrl ? new URL(collectorUrl).hostname : "collector.apidepth.io"}\n`);
-      process.stdout.write("\nAny internal API patterns to ignore? (comma-separated, wildcards ok)\n");
+      process.stdout.write(
+        `  • ${collectorUrl ? new URL(collectorUrl).hostname : "collector.apidepth.io"}\n`
+      );
+      process.stdout.write(
+        "\nAny internal API patterns to ignore? (comma-separated, wildcards ok)\n"
+      );
       process.stdout.write(
         "  Examples: *.internal, *.local, *.svc.cluster.local, *.railway.internal\n"
       );
@@ -66,7 +70,10 @@ export async function runSetup(argv: string[]): Promise<void> {
       if (raw) {
         ignoredHosts = [
           ...ignoredHosts,
-          ...raw.split(",").map((h) => h.trim()).filter(Boolean),
+          ...raw
+            .split(",")
+            .map((h) => h.trim())
+            .filter(Boolean),
         ];
       }
     }
@@ -80,7 +87,9 @@ export async function runSetup(argv: string[]): Promise<void> {
     });
 
     if (!noPrompt) {
-      process.stdout.write(`\nDetected: ${result.name.charAt(0).toUpperCase() + result.name.slice(1)}\n`);
+      process.stdout.write(
+        `\nDetected: ${result.name.charAt(0).toUpperCase() + result.name.slice(1)}\n`
+      );
     }
 
     if (result.initializerPath && !noPrompt) {
@@ -100,7 +109,9 @@ export async function runSetup(argv: string[]): Promise<void> {
     }
 
     if (!noPrompt) {
-      process.stdout.write("\nRun `npx apidepth test` to confirm events are reaching the collector.\n");
+      process.stdout.write(
+        "\nRun `npx apidepth test` to confirm events are reaching the collector.\n"
+      );
     }
   } finally {
     rl?.close();
@@ -121,7 +132,10 @@ function parseArgs(argv: string[]): SetupOptions {
         break;
       case "--ignored-hosts": {
         const raw = args.shift() ?? "";
-        options.ignoredHosts = raw.split(",").map((h) => h.trim()).filter(Boolean);
+        options.ignoredHosts = raw
+          .split(",")
+          .map((h) => h.trim())
+          .filter(Boolean);
         break;
       }
       case "--no-prompt":

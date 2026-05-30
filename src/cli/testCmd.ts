@@ -116,11 +116,17 @@ function _sendTestEvent(apiKey: string, baseUrl: string): Promise<number> {
           resolve(Date.now() - start);
         } else if (status === 401 || status === 403) {
           reject(
-            new TestError(`API key not recognised (HTTP ${status}).`, "Check the key in your initializer matches your dashboard at https://apidepth.io/dashboard/api-keys")
+            new TestError(
+              `API key not recognised (HTTP ${status}).`,
+              "Check the key in your initializer matches your dashboard at https://apidepth.io/dashboard/api-keys"
+            )
           );
         } else {
           reject(
-            new TestError(`Collector returned HTTP ${status}.`, "Check https://status.apidepth.io for service status.")
+            new TestError(
+              `Collector returned HTTP ${status}.`,
+              "Check https://status.apidepth.io for service status."
+            )
           );
         }
       });
@@ -129,16 +135,29 @@ function _sendTestEvent(apiKey: string, baseUrl: string): Promise<number> {
     req.setTimeout(TIMEOUT_MS, () => {
       req.destroy();
       reject(
-        new TestError(`No response after ${TIMEOUT_MS / 1000} seconds.`, "Check for a firewall blocking outbound port 443.")
+        new TestError(
+          `No response after ${TIMEOUT_MS / 1000} seconds.`,
+          "Check for a firewall blocking outbound port 443."
+        )
       );
     });
 
     req.on("error", (err: NodeJS.ErrnoException) => {
       const msg = err.message.toLowerCase();
       if (msg.includes("ssl") || msg.includes("cert")) {
-        reject(new TestError(`SSL certificate verification failed: ${err.message}`, "Check your Node.js SSL configuration."));
+        reject(
+          new TestError(
+            `SSL certificate verification failed: ${err.message}`,
+            "Check your Node.js SSL configuration."
+          )
+        );
       } else if (err.code === "ECONNREFUSED" || msg.includes("getaddrinfo")) {
-        reject(new TestError(`Could not reach collector: ${err.message}`, "Check outbound HTTPS (port 443) is allowed from this environment."));
+        reject(
+          new TestError(
+            `Could not reach collector: ${err.message}`,
+            "Check outbound HTTPS (port 443) is allowed from this environment."
+          )
+        );
       } else {
         reject(new TestError(`Connection error: ${err.message}`));
       }

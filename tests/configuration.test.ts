@@ -54,7 +54,9 @@ describe("Configuration", () => {
 
   it("does not throw on malformed collectorUrl", () => {
     const c = new Configuration();
-    expect(() => { c.collectorUrl = "not a url"; }).not.toThrow();
+    expect(() => {
+      c.collectorUrl = "not a url";
+    }).not.toThrow();
   });
 
   it("getConfiguration returns same singleton", () => {

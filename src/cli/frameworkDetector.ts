@@ -56,7 +56,11 @@ function _hasNpmDep(dir: string, pkg: string): boolean {
 
 function _buildResult(
   framework: string,
-  { apiKey, ignoredHosts, collectorUrl }: { apiKey: string | null; ignoredHosts: string[]; collectorUrl: string | null }
+  {
+    apiKey,
+    ignoredHosts,
+    collectorUrl,
+  }: { apiKey: string | null; ignoredHosts: string[]; collectorUrl: string | null }
 ): DetectedFramework {
   const keyVal = apiKey ? JSON.stringify(apiKey) : '"YOUR_API_KEY"';
   const urlVal = collectorUrl ? JSON.stringify(collectorUrl) : '"https://collector.apidepth.io"';
