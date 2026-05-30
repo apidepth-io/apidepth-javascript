@@ -22,9 +22,13 @@
       "require": "./dist/integrations/nextjs.js"
     }
   },
+  "bin": {
+    "apidepth": "./bin/apidepth.js"
+  },
   "sideEffects": true,
   "files": [
     "dist",
+    "bin",
     "README.md",
     "LICENSE"
   ],

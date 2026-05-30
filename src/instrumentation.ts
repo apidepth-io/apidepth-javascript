@@ -72,7 +72,7 @@ function _makeWrapper(originalFn: RequestFn): RequestFn {
     if (!info) return req;
     const { host, path, method } = info;
 
-    if (config.ignoredHosts.includes(host)) return req;
+    if (config.isIgnoredHost(host)) return req;
     if (!_sampled(config.sampleRate)) return req;
 
     const start = performance.now();
@@ -155,7 +155,7 @@ function _patchFetch(): void {
       (init?.method ?? (input instanceof Request ? input.method : "GET")) as string
     ).toUpperCase();
 
-    if (config.ignoredHosts.includes(host)) return originalFetch(input, init);
+    if (config.isIgnoredHost(host)) return originalFetch(input, init);
     if (!_sampled(config.sampleRate)) return originalFetch(input, init);
 
     const start = performance.now();
