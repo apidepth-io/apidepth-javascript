@@ -111,6 +111,25 @@ describe("instrumentation ignored_hosts", () => {
 
     (https as { request: typeof https.request }).request = originalRequest;
   });
+
+  it("does not record events for glob-matched ignored hosts", async () => {
+    getConfiguration().ignoredHosts = ["*.internal"];
+    const originalRequest = https.request;
+
+    (https as { request: typeof https.request }).request = vi.fn(() =>
+      makeFakeRequest({ statusCode: 200 })
+    ) as unknown as typeof https.request;
+
+    instrument();
+
+    const req = https.request({ hostname: "api.internal", path: "/health", method: "GET" });
+    req.end();
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(0);
+
+    (https as { request: typeof https.request }).request = originalRequest;
+  });
 });
 
 // ---------------------------------------------------------------------------
