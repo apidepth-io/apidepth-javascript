@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -95,7 +95,7 @@ jobs:
           uvicorn main:app --host 0.0.0.0 --port 8000 &
           timeout 30 bash -c 'until curl -sf http://localhost:8000/v1/status; do sleep 1; done'
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
