@@ -87,7 +87,8 @@ function _makeWrapper(originalFn: RequestFn): RequestFn {
     req.on("response", (res: IncomingMessage) => {
       const durationMs = Math.round(performance.now() - start);
       const ct = (res.headers["content-type"] ?? "") as string;
-      const captureModel = config.captureModelNames && isAiVendorHost(host) && ct.includes("application/json");
+      const captureModel =
+        config.captureModelNames && isAiVendorHost(host) && ct.includes("application/json");
 
       if (captureModel) {
         // Passively collect body chunks to extract model name.
@@ -213,7 +214,8 @@ function _patchFetch(): void {
         headers[k] = v;
       });
       const ct = headers["content-type"] ?? "";
-      const captureModel = config.captureModelNames && isAiVendorHost(host) && ct.includes("application/json");
+      const captureModel =
+        config.captureModelNames && isAiVendorHost(host) && ct.includes("application/json");
 
       if (captureModel) {
         // Clone before the caller reads the body. Fire-and-forget: the event
@@ -223,13 +225,38 @@ function _patchFetch(): void {
           .text()
           .then((text) => {
             const modelName = extractModelNameFromBody(text) ?? undefined;
-            _recordSuccess({ host, path, method, status: response.status, headers, durationMs, coldStart: false, modelName });
+            _recordSuccess({
+              host,
+              path,
+              method,
+              status: response.status,
+              headers,
+              durationMs,
+              coldStart: false,
+              modelName,
+            });
           })
           .catch(() => {
-            _recordSuccess({ host, path, method, status: response.status, headers, durationMs, coldStart: false });
+            _recordSuccess({
+              host,
+              path,
+              method,
+              status: response.status,
+              headers,
+              durationMs,
+              coldStart: false,
+            });
           });
       } else {
-        _recordSuccess({ host, path, method, status: response.status, headers, durationMs, coldStart: false });
+        _recordSuccess({
+          host,
+          path,
+          method,
+          status: response.status,
+          headers,
+          durationMs,
+          coldStart: false,
+        });
       }
       return response;
     } catch (err) {

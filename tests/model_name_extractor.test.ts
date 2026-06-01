@@ -50,12 +50,22 @@ describe("extractModelNameFromBody — happy path", () => {
   });
 
   it("extracts model name from Anthropic message response", () => {
-    const body = JSON.stringify({ id: "msg_01", type: "message", model: "claude-3-opus-20240229", content: [] });
+    const body = JSON.stringify({
+      id: "msg_01",
+      type: "message",
+      model: "claude-3-opus-20240229",
+      content: [],
+    });
     expect(extractModelNameFromBody(body)).toBe("claude-3-opus-20240229");
   });
 
   it("returns model name even when other fields are present", () => {
-    const body = JSON.stringify({ id: "xyz", object: "chat.completion", model: "gpt-4o", choices: [] });
+    const body = JSON.stringify({
+      id: "xyz",
+      object: "chat.completion",
+      model: "gpt-4o",
+      choices: [],
+    });
     expect(extractModelNameFromBody(body)).toBe("gpt-4o");
   });
 });
