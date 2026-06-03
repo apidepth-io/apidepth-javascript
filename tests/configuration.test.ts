@@ -85,4 +85,10 @@ describe("configure() validation", () => {
     configure({ apiKey: "apd_live_abc123" });
     expect(getConfiguration().apiKey).toBe("apd_live_abc123");
   });
+
+  it("applies options without an apiKey without calling validateApiKey", () => {
+    configure({ enabled: false });
+    expect(getConfiguration().enabled).toBe(false);
+    expect(getConfiguration().apiKey).toBeNull();
+  });
 });

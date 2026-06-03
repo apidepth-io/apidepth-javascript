@@ -86,4 +86,29 @@ describe("extractRateLimitHeaders", () => {
     expect("rl_limit" in result!).toBe(false);
     expect("rl_reset_at" in result!).toBe(false);
   });
+
+  it("handles array-valued headers by using the first element", () => {
+    const result = extractRateLimitHeaders({ "x-ratelimit-remaining-requests": ["42", "99"] }, NOW);
+    expect(result?.rl_remaining).toBe(42);
+  });
+
+  it("skips a header whose value is negative and falls back to the next name", () => {
+    // "-1" fails the n >= 0 guard; limit via the second header family still works
+    const result = extractRateLimitHeaders(
+      { "x-ratelimit-remaining-requests": "-1", "x-ratelimit-limit-requests": "100" },
+      NOW
+    );
+    expect(result?.rl_remaining).toBeUndefined();
+    expect(result?.rl_limit).toBe(100);
+  });
+
+  it("skips an unparseable reset header and falls back to retry-after", () => {
+    // "not-a-reset" is not a number or duration, so normalizeResetMs returns undefined
+    // → the false branch of `if (ms !== undefined)` fires, and the loop continues to retry-after
+    const result = extractRateLimitHeaders(
+      { "x-ratelimit-reset-requests": "not-a-reset", "retry-after": "5" },
+      NOW
+    );
+    expect(result?.rl_reset_at).toBe(NOW + 5_000);
+  });
 });

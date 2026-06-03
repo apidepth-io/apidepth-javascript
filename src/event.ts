@@ -20,6 +20,7 @@ export interface ApidepthEvent {
   rl_remaining?: number;
   rl_limit?: number;
   rl_reset_at?: number;
+  model_name?: string;
 }
 
 const REQUIRED = new Set(["vendor", "endpoint", "method", "outcome", "duration_ms", "ts"]);

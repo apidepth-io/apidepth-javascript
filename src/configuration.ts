@@ -18,6 +18,7 @@ export class Configuration {
   environment: string | null = null;
   sampleRate = 1.0;
   extraVendors: Record<string, string> = {};
+  captureModelNames = true;
 
   private _collectorUrl: string | null = null;
   private _userHosts: string[] = [];

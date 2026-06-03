@@ -29,6 +29,7 @@ import { extractRateLimitHeaders } from "./rate_limit_headers.js";
 import { Collector } from "./collector.js";
 import { buildEvent, type Outcome } from "./event.js";
 import { isSkipped } from "./skip.js";
+import { isAiVendorHost, extractModelNameFromBody } from "./model_name_extractor.js";
 
 let _httpPatched = false;
 let _httpsPatched = false;
@@ -85,15 +86,61 @@ function _makeWrapper(originalFn: RequestFn): RequestFn {
 
     req.on("response", (res: IncomingMessage) => {
       const durationMs = Math.round(performance.now() - start);
-      _recordSuccess({
-        host,
-        path,
-        method,
-        status: res.statusCode ?? 0,
-        headers: res.headers as Record<string, string | string[]>,
-        durationMs,
-        coldStart,
-      });
+      const ct = (res.headers["content-type"] ?? "") as string;
+      const captureModel =
+        config.captureModelNames && isAiVendorHost(host) && ct.includes("application/json");
+
+      if (captureModel) {
+        // Passively collect body chunks to extract model name.
+        // Attaching a 'data' listener puts the stream in flowing mode; all
+        // registered 'data' listeners (ours and the application's) receive
+        // the same chunks — neither side consumes the other's data.
+        let buffer = "";
+        let capped = false;
+
+        res.on("data", (chunk: Buffer | string) => {
+          if (!capped) {
+            buffer += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+            if (buffer.length >= 8_192) capped = true;
+          }
+        });
+
+        res.on("end", () => {
+          const modelName = extractModelNameFromBody(buffer) ?? undefined;
+          _recordSuccess({
+            host,
+            path,
+            method,
+            status: res.statusCode ?? 0,
+            headers: res.headers as Record<string, string | string[]>,
+            durationMs,
+            coldStart,
+            modelName,
+          });
+        });
+
+        res.on("error", () => {
+          _recordSuccess({
+            host,
+            path,
+            method,
+            status: res.statusCode ?? 0,
+            headers: res.headers as Record<string, string | string[]>,
+            durationMs,
+            coldStart,
+          });
+        });
+      } else {
+        _recordSuccess({
+          host,
+          path,
+          method,
+          status: res.statusCode ?? 0,
+          headers: res.headers as Record<string, string | string[]>,
+          durationMs,
+          coldStart,
+        });
+      }
     });
 
     req.on("error", (err: Error) => {
@@ -166,16 +213,51 @@ function _patchFetch(): void {
       response.headers.forEach((v, k) => {
         headers[k] = v;
       });
-      // fetch does not expose socket-level connection reuse
-      _recordSuccess({
-        host,
-        path,
-        method,
-        status: response.status,
-        headers,
-        durationMs,
-        coldStart: false,
-      });
+      const ct = headers["content-type"] ?? "";
+      const captureModel =
+        config.captureModelNames && isAiVendorHost(host) && ct.includes("application/json");
+
+      if (captureModel) {
+        // Clone before the caller reads the body. Fire-and-forget: the event
+        // records asynchronously but well within the 20-second flush interval.
+        response
+          .clone()
+          .text()
+          .then((text) => {
+            const modelName = extractModelNameFromBody(text) ?? undefined;
+            _recordSuccess({
+              host,
+              path,
+              method,
+              status: response.status,
+              headers,
+              durationMs,
+              coldStart: false,
+              modelName,
+            });
+          })
+          .catch(() => {
+            _recordSuccess({
+              host,
+              path,
+              method,
+              status: response.status,
+              headers,
+              durationMs,
+              coldStart: false,
+            });
+          });
+      } else {
+        _recordSuccess({
+          host,
+          path,
+          method,
+          status: response.status,
+          headers,
+          durationMs,
+          coldStart: false,
+        });
+      }
       return response;
     } catch (err) {
       const durationMs = Math.round(performance.now() - start);
@@ -206,6 +288,7 @@ interface SuccessArgs {
   headers: Record<string, string | string[]>;
   durationMs: number;
   coldStart: boolean;
+  modelName?: string;
 }
 
 function _recordSuccess({
@@ -216,6 +299,7 @@ function _recordSuccess({
   headers,
   durationMs,
   coldStart,
+  modelName,
 }: SuccessArgs): void {
   try {
     const result = VendorRegistry.identify(host, path);
@@ -238,6 +322,7 @@ function _recordSuccess({
         env: _resolveEnv(),
         ts: nowMs,
         ...(rl ?? {}),
+        ...(modelName ? { model_name: modelName } : {}),
       })
     );
   } catch {
