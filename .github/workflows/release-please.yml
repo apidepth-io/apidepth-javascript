@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force_publish:
+        description: "Re-publish the current version (use after a failed publish)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -24,7 +29,7 @@ jobs:
 
   publish:
     needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
+    if: needs.release-please.outputs.release_created == 'true' || inputs.force_publish == true
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,7 +39,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
-          registry-url: "https://registry.npmjs.org"
       - name: Install dependencies
         run: npm ci
       - name: Build
