@@ -44,9 +44,7 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Login via OIDC Trusted Publisher
+        run: npm login --auth-type=oidc --registry=https://registry.npmjs.org
       - name: Publish to npm
-        run: |
-          # setup-node writes _authToken=${NODE_AUTH_TOKEN} to .npmrc; remove it
-          # so npm falls through to its built-in OIDC Trusted Publisher exchange.
-          npm config delete //registry.npmjs.org/:_authToken
-          npm publish --provenance
+        run: npm publish --provenance
