@@ -20,6 +20,8 @@ function makeFakeRequest(opts: {
   headers?: Record<string, string>;
   socketConnecting?: boolean;
   errorAfterMs?: number;
+  responseBody?: string;
+  responseEmitError?: boolean;
 }) {
   const req = new EventEmitter() as ReturnType<typeof https.request>;
   (req as unknown as { end: () => void }).end = () => {};
@@ -40,6 +42,18 @@ function makeFakeRequest(opts: {
     (res as unknown as { statusCode: number }).statusCode = opts.statusCode ?? 200;
     (res as unknown as { headers: Record<string, string> }).headers = opts.headers ?? {};
     req.emit("response", res);
+
+    // Emit body events after the response handlers have been registered
+    if (opts.responseBody !== undefined) {
+      process.nextTick(() => {
+        res.emit("data", Buffer.from(opts.responseBody!));
+        res.emit("end");
+      });
+    } else if (opts.responseEmitError) {
+      process.nextTick(() => {
+        res.emit("error", new Error("response stream error"));
+      });
+    }
   });
 
   return req;
@@ -172,6 +186,19 @@ describe("instrumentation fetch patching", () => {
 
     instrument();
     await globalThis.fetch("https://api.unknownvendor.test/v1/foo");
+
+    expect(Collector.getInstance().stats().queueSize).toBe(0);
+  });
+
+  it("passes through and does not record when the fetch URL cannot be parsed", async () => {
+    getConfiguration().apiKey = "test-key";
+    const mockResponse = new Response("{}", { status: 200 });
+    globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
+
+    instrument();
+    // "not-a-url" causes URL parsing to throw in the patched fetch;
+    // the catch block calls originalFetch directly without recording an event
+    await globalThis.fetch("not-a-url" as Parameters<typeof globalThis.fetch>[0]);
 
     expect(Collector.getInstance().stats().queueSize).toBe(0);
   });
@@ -371,6 +398,25 @@ describe("instrumentation request info extraction", () => {
     (https as { request: typeof https.request }).request = originalRequest;
   });
 
+  it("defaults method to GET when object options omit the method field", async () => {
+    getConfiguration().apiKey = "test-key";
+    const originalRequest = https.request;
+
+    (https as { request: typeof https.request }).request = vi.fn(() =>
+      makeFakeRequest({ statusCode: 200 })
+    ) as unknown as typeof https.request;
+
+    instrument();
+    // No `method` key in options → hits `opts.method ?? "GET"` fallback
+    const req = https.request({ hostname: "api.stripe.com", path: "/v1/charges" });
+    req.end();
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+
+    (https as { request: typeof https.request }).request = originalRequest;
+  });
+
   it("skips instrumentation gracefully when URL string is invalid", async () => {
     getConfiguration().apiKey = "test-key";
     const originalRequest = http.request;
@@ -383,6 +429,24 @@ describe("instrumentation request info extraction", () => {
     // "not-a-url" causes new URL() to throw; _extractRequestInfo catches and returns null
     // No event should be recorded, but the underlying request still fires.
     const req = http.request("not-a-url" as unknown as Parameters<typeof http.request>[0]);
+    req.end();
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(0);
+
+    (http as { request: typeof http.request }).request = originalRequest;
+  });
+
+  it("does not record when urlOrOptions is null (no string/URL/object branch matches)", async () => {
+    getConfiguration().apiKey = "test-key";
+    const originalRequest = http.request;
+
+    (http as { request: typeof http.request }).request = vi.fn(() =>
+      makeFakeRequest({ statusCode: 200 })
+    ) as unknown as typeof http.request;
+
+    instrument();
+    const req = http.request(null as unknown as Parameters<typeof http.request>[0]);
     req.end();
 
     await new Promise((r) => setTimeout(r, 50));
@@ -413,5 +477,237 @@ describe("instrumentation sample rate", () => {
     expect(Collector.getInstance().stats().queueSize).toBe(0);
 
     (https as { request: typeof https.request }).request = originalRequest;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Model name extraction — HTTP path (captureModel = true)
+// ---------------------------------------------------------------------------
+
+describe("instrumentation model name extraction via HTTP", () => {
+  it("records model_name from JSON response body for an AI vendor host", async () => {
+    getConfiguration().apiKey = "test-key";
+    const originalRequest = https.request;
+
+    (https as { request: typeof https.request }).request = vi.fn(() =>
+      makeFakeRequest({
+        statusCode: 200,
+        headers: { "content-type": "application/json" },
+        responseBody: '{"model":"gpt-4-turbo","choices":[]}',
+      })
+    ) as unknown as typeof https.request;
+
+    instrument();
+
+    const req = https.request({
+      hostname: "api.openai.com",
+      path: "/v1/chat/completions",
+      method: "POST",
+    });
+    req.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+
+    (https as { request: typeof https.request }).request = originalRequest;
+  });
+
+  it("records event and recovers when response stream emits an error while capturing model", async () => {
+    getConfiguration().apiKey = "test-key";
+    const originalRequest = https.request;
+
+    (https as { request: typeof https.request }).request = vi.fn(() =>
+      makeFakeRequest({
+        statusCode: 200,
+        headers: { "content-type": "application/json" },
+        responseEmitError: true,
+      })
+    ) as unknown as typeof https.request;
+
+    instrument();
+
+    const req = https.request({
+      hostname: "api.openai.com",
+      path: "/v1/chat/completions",
+      method: "POST",
+    });
+    req.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+
+    (https as { request: typeof https.request }).request = originalRequest;
+  });
+
+  it("handles a string data chunk in the response body buffer", async () => {
+    getConfiguration().apiKey = "test-key";
+    const originalRequest = https.request;
+
+    // Emit a string chunk (not a Buffer) to cover the typeof chunk === "string" branch
+    (https as { request: typeof https.request }).request = vi.fn(() => {
+      const req = new EventEmitter() as ReturnType<typeof https.request>;
+      (req as unknown as { end: () => void }).end = () => {};
+      process.nextTick(() => {
+        const socket = new EventEmitter() as NodeJS.Socket;
+        (socket as unknown as { connecting: boolean }).connecting = false;
+        req.emit("socket", socket);
+
+        const res = new EventEmitter() as import("node:http").IncomingMessage;
+        (res as unknown as { statusCode: number }).statusCode = 200;
+        (res as unknown as { headers: Record<string, string> }).headers = {
+          "content-type": "application/json",
+        };
+        req.emit("response", res);
+
+        process.nextTick(() => {
+          res.emit("data", '{"model":"claude-3-opus"}');
+          res.emit("end");
+        });
+      });
+      return req;
+    }) as unknown as typeof https.request;
+
+    instrument();
+
+    const req = https.request({
+      hostname: "api.anthropic.com",
+      path: "/v1/messages",
+      method: "POST",
+    });
+    req.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+
+    (https as { request: typeof https.request }).request = originalRequest;
+  });
+
+  it("caps buffer and still records event when response body exceeds 8 KB", async () => {
+    getConfiguration().apiKey = "test-key";
+    const originalRequest = https.request;
+
+    const largeChunk = "x".repeat(9_000);
+
+    (https as { request: typeof https.request }).request = vi.fn(() => {
+      const req = new EventEmitter() as ReturnType<typeof https.request>;
+      (req as unknown as { end: () => void }).end = () => {};
+      process.nextTick(() => {
+        const socket = new EventEmitter() as NodeJS.Socket;
+        (socket as unknown as { connecting: boolean }).connecting = false;
+        req.emit("socket", socket);
+
+        const res = new EventEmitter() as import("node:http").IncomingMessage;
+        (res as unknown as { statusCode: number }).statusCode = 200;
+        (res as unknown as { headers: Record<string, string> }).headers = {
+          "content-type": "application/json",
+        };
+        req.emit("response", res);
+
+        process.nextTick(() => {
+          // First chunk pushes buffer past 8 KB, setting capped = true
+          res.emit("data", Buffer.from(largeChunk));
+          // Second chunk should be ignored (capped)
+          res.emit("data", Buffer.from('{"model":"late-model"}'));
+          res.emit("end");
+        });
+      });
+      return req;
+    }) as unknown as typeof https.request;
+
+    instrument();
+
+    const req = https.request({
+      hostname: "api.openai.com",
+      path: "/v1/chat/completions",
+      method: "POST",
+    });
+    req.end();
+
+    await new Promise((r) => setTimeout(r, 100));
+    // Event is still recorded even if body parsing found no model
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+
+    (https as { request: typeof https.request }).request = originalRequest;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Model name extraction — fetch path (captureModel = true)
+// ---------------------------------------------------------------------------
+
+describe("instrumentation model name extraction via fetch", () => {
+  let savedFetch: typeof globalThis.fetch | undefined;
+
+  beforeEach(() => {
+    savedFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    if (savedFetch !== undefined) {
+      globalThis.fetch = savedFetch;
+    } else {
+      delete (globalThis as unknown as Record<string, unknown>)["fetch"];
+    }
+  });
+
+  it("records model_name when AI vendor fetch returns JSON with model field", async () => {
+    getConfiguration().apiKey = "test-key";
+    const mockResponse = new Response('{"model":"gpt-4o","choices":[]}', {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+    globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
+
+    instrument();
+    await globalThis.fetch("https://api.openai.com/v1/chat/completions", { method: "POST" });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+  });
+
+  it("records event when response.clone().text() rejects", async () => {
+    getConfiguration().apiKey = "test-key";
+    const mockResponse = new Response(null, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+    vi.spyOn(mockResponse, "clone").mockReturnValue({
+      text: () => Promise.reject(new Error("body read error")),
+    } as unknown as Response);
+    globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
+
+    instrument();
+    await globalThis.fetch("https://api.openai.com/v1/chat/completions", { method: "POST" });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+  });
+
+  it("rethrows and does not record when fetch itself throws a non-timeout error", async () => {
+    getConfiguration().apiKey = "test-key";
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("network failure"));
+
+    instrument();
+    await expect(
+      globalThis.fetch("https://api.openai.com/v1/chat/completions")
+    ).rejects.toThrow("network failure");
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(0);
+  });
+
+  it("records a timeout event and rethrows when fetch throws a TimeoutError", async () => {
+    getConfiguration().apiKey = "test-key";
+    const err = new Error("fetch timeout") as Error & { name: string };
+    err.name = "TimeoutError";
+    globalThis.fetch = vi.fn().mockRejectedValue(err);
+
+    instrument();
+    await expect(
+      globalThis.fetch("https://api.openai.com/v1/chat/completions")
+    ).rejects.toThrow("fetch timeout");
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
   });
 });

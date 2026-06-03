@@ -130,6 +130,27 @@ describe("VendorRegistry.replace version fallback", () => {
   });
 });
 
+describe("VendorRegistry sparse registry shapes", () => {
+  it("handles a registry with no vendors field", () => {
+    // Covers the `registry.vendors ?? {}` fallback in buildHosts/buildPatterns
+    expect(() =>
+      VendorRegistry.replace({ version: "empty" } as import("../src/vendor_registry.js").RegistryJson)
+    ).not.toThrow();
+    expect(VendorRegistry.identify("api.stripe.com", "/v1/charges")).toBeNull();
+  });
+
+  it("handles a vendor entry with no hosts or patterns fields", () => {
+    // Covers the `cfg.hosts ?? []` and `cfg.patterns ?? []` fallbacks
+    expect(() =>
+      VendorRegistry.replace({
+        version: "sparse",
+        vendors: { sparse: {} as import("../src/vendor_registry.js").RegistryJson["vendors"][string] },
+      })
+    ).not.toThrow();
+    expect(VendorRegistry.identify("sparse.example.com", "/v1/foo")).toBeNull();
+  });
+});
+
 describe("VendorRegistry invalid regex guard", () => {
   it("skips syntactically invalid regex patterns without throwing", () => {
     // "[" is not caught by the unsafe-pattern guard but throws in new RegExp().
