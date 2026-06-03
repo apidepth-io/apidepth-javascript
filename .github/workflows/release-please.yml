@@ -44,7 +44,9 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
-      - name: Login via OIDC Trusted Publisher
-        run: npm login --auth-type=oidc --registry=https://registry.npmjs.org
+      - name: Upgrade npm for OIDC Trusted Publisher support (requires npm >=11.6.4)
+        run: npm install -g npm@^11
       - name: Publish to npm
-        run: npm publish --provenance
+        run: |
+          npm config delete //registry.npmjs.org/:_authToken
+          npm publish --provenance
