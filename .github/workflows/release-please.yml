@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write  # required for npm trusted publisher (OIDC)
+      id-token: write  # required for OIDC trusted publisher + provenance
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -44,16 +44,9 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
-      - name: Get OIDC token for npm Trusted Publisher
-        id: npm-oidc
-        run: |
-          TOKEN=$(curl -sS -f \
-            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://registry.npmjs.org" \
-            | jq -r .value)
-          echo "::add-mask::${TOKEN}"
-          echo "token=${TOKEN}" >> "${GITHUB_OUTPUT}"
       - name: Publish to npm
-        run: npm publish --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ steps.npm-oidc.outputs.token }}
+        run: |
+          # setup-node writes _authToken=${NODE_AUTH_TOKEN} to .npmrc; remove it
+          # so npm falls through to its built-in OIDC Trusted Publisher exchange.
+          npm config delete //registry.npmjs.org/:_authToken
+          npm publish --provenance
