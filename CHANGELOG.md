@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.3.0](https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.2.0...apidepth-v0.3.0) (2026-06-03)
+
+
+### Features
+
+* add model name extraction from AI vendor response bodies ([#26](https://github.com/apidepth-io/apidepth-javascript/issues/26)) ([ee7fdec](https://github.com/apidepth-io/apidepth-javascript/commit/ee7fdec1f7aeb3cc8cc39f917b9b9bf1207ef2d9))
+
 ## [0.2.0](https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.1.1...apidepth-v0.2.0) (2026-05-30)
 
 ### Features
