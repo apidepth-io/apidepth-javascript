@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.3.1](https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.3.0...apidepth-v0.3.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* use OIDC trusted publisher for npm publish ([#28](https://github.com/apidepth-io/apidepth-javascript/issues/28)) ([f82bf1a](https://github.com/apidepth-io/apidepth-javascript/commit/f82bf1ae100244e829a6facff1b8bb86106dbc59))
+
 ## [0.3.0](https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.2.0...apidepth-v0.3.0) (2026-06-03)
 
 ### Features
