@@ -134,7 +134,9 @@ describe("VendorRegistry sparse registry shapes", () => {
   it("handles a registry with no vendors field", () => {
     // Covers the `registry.vendors ?? {}` fallback in buildHosts/buildPatterns
     expect(() =>
-      VendorRegistry.replace({ version: "empty" } as import("../src/vendor_registry.js").RegistryJson)
+      VendorRegistry.replace({
+        version: "empty",
+      } as import("../src/vendor_registry.js").RegistryJson)
     ).not.toThrow();
     expect(VendorRegistry.identify("api.stripe.com", "/v1/charges")).toBeNull();
   });
@@ -144,7 +146,9 @@ describe("VendorRegistry sparse registry shapes", () => {
     expect(() =>
       VendorRegistry.replace({
         version: "sparse",
-        vendors: { sparse: {} as import("../src/vendor_registry.js").RegistryJson["vendors"][string] },
+        vendors: {
+          sparse: {} as import("../src/vendor_registry.js").RegistryJson["vendors"][string],
+        },
       })
     ).not.toThrow();
     expect(VendorRegistry.identify("sparse.example.com", "/v1/foo")).toBeNull();

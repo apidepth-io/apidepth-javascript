@@ -688,9 +688,9 @@ describe("instrumentation model name extraction via fetch", () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new Error("network failure"));
 
     instrument();
-    await expect(
-      globalThis.fetch("https://api.openai.com/v1/chat/completions")
-    ).rejects.toThrow("network failure");
+    await expect(globalThis.fetch("https://api.openai.com/v1/chat/completions")).rejects.toThrow(
+      "network failure"
+    );
 
     await new Promise((r) => setTimeout(r, 50));
     expect(Collector.getInstance().stats().queueSize).toBe(0);
@@ -703,9 +703,9 @@ describe("instrumentation model name extraction via fetch", () => {
     globalThis.fetch = vi.fn().mockRejectedValue(err);
 
     instrument();
-    await expect(
-      globalThis.fetch("https://api.openai.com/v1/chat/completions")
-    ).rejects.toThrow("fetch timeout");
+    await expect(globalThis.fetch("https://api.openai.com/v1/chat/completions")).rejects.toThrow(
+      "fetch timeout"
+    );
 
     await new Promise((r) => setTimeout(r, 50));
     expect(Collector.getInstance().stats().queueSize).toBe(1);

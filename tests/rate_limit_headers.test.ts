@@ -88,10 +88,7 @@ describe("extractRateLimitHeaders", () => {
   });
 
   it("handles array-valued headers by using the first element", () => {
-    const result = extractRateLimitHeaders(
-      { "x-ratelimit-remaining-requests": ["42", "99"] },
-      NOW
-    );
+    const result = extractRateLimitHeaders({ "x-ratelimit-remaining-requests": ["42", "99"] }, NOW);
     expect(result?.rl_remaining).toBe(42);
   });
 
