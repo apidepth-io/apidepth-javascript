@@ -59,10 +59,10 @@
     "eslint": "^10.4.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.3",
-    "@vitest/coverage-v8": "^1.6.0",
+    "@vitest/coverage-v8": "^4.1.7",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
-    "vitest": "^1.6.0"
+    "vitest": "^4.1.7"
   },
   "keywords": [
     "api",
