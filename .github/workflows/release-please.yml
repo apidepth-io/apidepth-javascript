@@ -44,6 +44,15 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Get OIDC token for npm Trusted Publisher
+        id: npm-oidc
+        run: |
+          TOKEN=$(curl -sS -f \
+            -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://registry.npmjs.org" \
+            | jq -r .value)
+          echo "::add-mask::${TOKEN}"
+          echo "token=${TOKEN}" >> "${GITHUB_OUTPUT}"
       - name: Publish to npm
         run: |
           # setup-node writes _authToken=${NODE_AUTH_TOKEN} to .npmrc; remove it
