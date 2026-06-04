@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { isAiVendorHost, extractModelNameFromBody } from "../src/model_name_extractor.js";
+import {
+  isAiVendorHost,
+  extractModelNameFromBody,
+  MODEL_SCAN_MAX_BYTES,
+} from "../src/model_name_extractor.js";
 
 // ---------------------------------------------------------------------------
 // isAiVendorHost
@@ -116,18 +120,22 @@ describe("extractModelNameFromBody — edge cases", () => {
 // extractModelNameFromBody — body truncation
 // ---------------------------------------------------------------------------
 
-describe("extractModelNameFromBody — body truncation", () => {
-  it("extracts model when field is within 8KB", () => {
-    // model is near the start — should be found after truncation
+describe("extractModelNameFromBody — large bodies (JS-003)", () => {
+  it("extracts model when the field is near the start", () => {
     const body = JSON.stringify({ model: "gpt-4-turbo", data: "x".repeat(100) });
     expect(extractModelNameFromBody(body)).toBe("gpt-4-turbo");
   });
 
-  it("returns null gracefully when body is truncated mid-JSON", () => {
-    // Build a body where the model field is beyond 8192 bytes
-    const prefix = '{"choices":[],"pad":"' + "x".repeat(8_200) + '","model":"late-model"}';
-    // Truncate at 8192 chars — leaves malformed JSON, model not reachable
-    const truncated = prefix.slice(0, 8_192);
-    expect(extractModelNameFromBody(truncated)).toBeNull();
+  it("captures a model field that follows a large data array (embeddings-style, >8KB)", () => {
+    // model sits ~20KB in — past the old 8KB parse cap, well within the scan bound
+    const body =
+      '{"object":"list","data":["' + "x".repeat(20_000) + '"],"model":"text-embedding-3-small"}';
+    expect(body.length).toBeGreaterThan(8_192);
+    expect(extractModelNameFromBody(body)).toBe("text-embedding-3-small");
+  });
+
+  it("returns null when the model field is beyond the scan bound", () => {
+    const body = '{"data":["' + "x".repeat(MODEL_SCAN_MAX_BYTES) + '"],"model":"too-far-away"}';
+    expect(extractModelNameFromBody(body)).toBeNull();
   });
 });

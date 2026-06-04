@@ -318,19 +318,20 @@ describe("instrumentation outcome mapping", () => {
       ) as unknown as typeof https.request;
 
       instrument();
+      const recordSpy = vi.spyOn(Collector.getInstance(), "record");
       const req = https.request({ hostname: "api.stripe.com", path: "/v1/charges", method: "GET" });
       req.end();
 
       await new Promise((r) => setTimeout(r, 50));
 
-      // We only care that an event was recorded (or not for skip cases).
-      // Outcome field is verified implicitly by the collector accepting it.
       expect(Collector.getInstance().stats().queueSize).toBe(1);
+      expect(recordSpy.mock.calls[0][0].outcome).toBe(expectedOutcome);
 
+      recordSpy.mockRestore();
       (https as { request: typeof https.request }).request = originalRequest;
     });
 
-  makeTestCase(301, "redirect");
+  makeTestCase(301, "unknown");
   makeTestCase(404, "client_error");
   makeTestCase(500, "server_error");
   makeTestCase(600, "unknown");
@@ -709,5 +710,29 @@ describe("instrumentation model name extraction via fetch", () => {
 
     await new Promise((r) => setTimeout(r, 50));
     expect(Collector.getInstance().stats().queueSize).toBe(1);
+  });
+});
+
+describe("instrumentation covers http.get / https.get (JS-009)", () => {
+  it("records an event for a direct https.get call", async () => {
+    getConfiguration().apiKey = "test-key";
+    const originalRequest = https.request;
+    const originalGet = https.get;
+
+    (https as { request: typeof https.request }).request = vi.fn(() =>
+      makeFakeRequest({ statusCode: 200 })
+    ) as unknown as typeof https.request;
+
+    instrument();
+
+    // https.get is now the SDK wrapper; it must route through the patched
+    // https.request (the get wrapper also calls req.end() for us).
+    https.get({ hostname: "api.stripe.com", path: "/v1/charges", method: "GET" });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+
+    (https as { request: typeof https.request }).request = originalRequest;
+    (https as { get: typeof https.get }).get = originalGet;
   });
 });

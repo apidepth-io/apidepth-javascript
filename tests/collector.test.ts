@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   Collector,
   validateCollectorUrl,
@@ -223,5 +223,81 @@ describe("Collector flush failures", () => {
     }
 
     expect(c.stats().consecutiveFailures).toBe(FAILURE_THRESHOLD);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// JS-006: API key is re-validated at send time, not only in configure()
+// ---------------------------------------------------------------------------
+
+describe("Collector send-time API key validation (JS-006)", () => {
+  let originalRequest: typeof https.request;
+  let requestCalled: boolean;
+
+  beforeEach(() => {
+    originalRequest = https.request;
+    requestCalled = false;
+    (https as unknown as { request: typeof https.request }).request = (() => {
+      requestCalled = true;
+      return makeFailingRequest();
+    }) as unknown as typeof https.request;
+    setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+  });
+
+  afterEach(() => {
+    (https as unknown as { request: typeof https.request }).request = originalRequest;
+    setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+  });
+
+  it("rejects a header-injection key set directly on config and never sends", async () => {
+    // Bypass configure() — assign the key straight onto the singleton, the path
+    // that previously skipped validation entirely.
+    getConfiguration().apiKey = "key\ninjected";
+    const errors: Error[] = [];
+    getConfiguration().onFlushError = (err) => errors.push(err);
+
+    const c = Collector.getInstance();
+    c.record(makeEvent());
+    await c.flush();
+
+    expect(requestCalled).toBe(false); // no bytes ever hit the socket
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toMatch(/illegal characters/);
+    expect(c.stats().consecutiveFailures).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// JS-010: SIGTERM handler must not force-exit out from under the host app
+// ---------------------------------------------------------------------------
+
+describe("Collector SIGTERM does not hijack shutdown (JS-010)", () => {
+  it("registers and removes its SIGTERM listener across getInstance/reset", () => {
+    const before = process.listenerCount("SIGTERM");
+    Collector.getInstance();
+    expect(process.listenerCount("SIGTERM")).toBe(before + 1);
+    Collector.reset();
+    expect(process.listenerCount("SIGTERM")).toBe(before);
+  });
+
+  it("flushes without calling process.exit when another SIGTERM listener exists", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const before = new Set(process.listeners("SIGTERM"));
+    Collector.getInstance();
+    const sdkHandler = process.listeners("SIGTERM").find((h) => !before.has(h)) as
+      | (() => void)
+      | undefined;
+    expect(sdkHandler).toBeDefined();
+
+    const appHandler = () => {};
+    process.on("SIGTERM", appHandler);
+    try {
+      sdkHandler!(); // invoke directly — does not raise a real signal
+      await new Promise((r) => setTimeout(r, 10));
+      expect(exitSpy).not.toHaveBeenCalled();
+    } finally {
+      process.off("SIGTERM", appHandler);
+      exitSpy.mockRestore();
+    }
   });
 });

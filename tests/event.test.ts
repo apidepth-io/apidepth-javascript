@@ -32,9 +32,9 @@ describe("buildEvent", () => {
     expect(result.rl_reset_at).toBe(1700000060000);
   });
 
-  it("accepts redirect as a valid outcome", () => {
-    const result = buildEvent({ ...VALID, outcome: "redirect" as Outcome, status: 301 });
-    expect(result.outcome).toBe("redirect");
+  it("passes the outcome through unchanged", () => {
+    const result = buildEvent({ ...VALID, outcome: "unknown" as Outcome, status: 301 });
+    expect(result.outcome).toBe("unknown");
   });
 
   it("throws when a required field is missing", () => {

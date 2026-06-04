@@ -9,6 +9,26 @@ export type FlushErrorCallback = (
 const HARD_IGNORED_HOSTS: readonly string[] = ["localhost", "127.0.0.1", "0.0.0.0", "::1"];
 
 export class Configuration {
+  // Canonical set of valid configuration keys, used by configure() to reject
+  // typos. Maintained explicitly (mirrors the Python SDK's VALID_KEYS and the
+  // Ruby attr list) rather than derived via Object.keys(new Configuration()):
+  // collectorUrl and ignoredHosts are prototype accessors, so reflection would
+  // both omit them and wrongly admit the private backing fields (see JS-005).
+  static readonly VALID_KEYS: ReadonlySet<string> = new Set([
+    "apiKey",
+    "collectorUrl",
+    "enabled",
+    "flushInterval",
+    "registryRefreshInterval",
+    "registryCachePath",
+    "ignoredHosts",
+    "onFlushError",
+    "environment",
+    "sampleRate",
+    "extraVendors",
+    "captureModelNames",
+  ]);
+
   apiKey: string | null = null;
   enabled = true;
   flushInterval = 20;

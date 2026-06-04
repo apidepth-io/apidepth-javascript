@@ -91,4 +91,33 @@ describe("configure() validation", () => {
     expect(getConfiguration().enabled).toBe(false);
     expect(getConfiguration().apiKey).toBeNull();
   });
+
+  // JS-005: collectorUrl and ignoredHosts are prototype accessors, so a
+  // reflection-derived key set would wrongly reject them.
+  it("accepts collectorUrl via configure() and runs its setter", () => {
+    expect(() =>
+      configure({ collectorUrl: "https://custom.collector.example.com/v1/events" })
+    ).not.toThrow();
+    const c = getConfiguration();
+    expect(c.collectorUrl).toBe("https://custom.collector.example.com/v1/events");
+    // setter side effect: the collector host is auto-ignored
+    expect(c.isIgnoredHost("custom.collector.example.com")).toBe(true);
+  });
+
+  it("accepts ignoredHosts via configure()", () => {
+    expect(() => configure({ ignoredHosts: ["*.internal"] })).not.toThrow();
+    expect(getConfiguration().isIgnoredHost("api.internal")).toBe(true);
+  });
+
+  it("rejects private backing fields that would bypass the setters", () => {
+    expect(() =>
+      configure({ _collectorUrl: "https://evil.example.com" } as unknown as Record<string, unknown>)
+    ).toThrow(/unknown option/);
+  });
+
+  it("still rejects genuinely unknown options", () => {
+    expect(() => configure({ notARealOption: true } as unknown as Record<string, unknown>)).toThrow(
+      /unknown option/
+    );
+  });
 });
