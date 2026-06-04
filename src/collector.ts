@@ -119,6 +119,15 @@ export class Collector {
       const drainAll = async () => {
         while (this._queue.length > 0) await this.flush();
       };
+      // If the host app (or another library) also handles SIGTERM, just flush
+      // and let them own process termination — never force-exit out from under
+      // their graceful shutdown (JS-010). We only call process.exit when we are
+      // the sole SIGTERM listener, because registering one suppresses Node's
+      // default terminate behavior, which we must then preserve ourselves.
+      if (process.listenerCount("SIGTERM") > 1) {
+        void drainAll();
+        return;
+      }
       drainAll().finally(() => process.exit(0));
     };
     process.on("beforeExit", this._beforeExitHandler);
@@ -204,6 +213,12 @@ export class Collector {
       }
       return Promise.resolve();
     }
+
+    // Defense-in-depth: re-validate at send time, matching the Ruby/Python
+    // SDKs. configure() validates too, but the key can also be set by directly
+    // assigning getConfiguration().apiKey, which bypasses that check (JS-006).
+    // Throwing here is caught by flush()/_safeFlush() as a flush failure.
+    validateApiKey(key);
 
     const extra = config.extraVendors;
     const payload: Record<string, unknown> = {

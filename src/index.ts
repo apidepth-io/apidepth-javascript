@@ -23,8 +23,9 @@ export type { ApidepthEvent, Outcome } from "./event.js";
 export type { RateLimitResult } from "./rate_limit_headers.js";
 export { VERSION } from "./version.js";
 
-// Valid configuration keys — used to reject typos early.
-const _validKeys = new Set(Object.keys(new Configuration()));
+// Valid configuration keys — used to reject typos early. Sourced from the
+// explicit Configuration.VALID_KEYS allow-list, not reflection (see JS-005).
+const _validKeys = Configuration.VALID_KEYS;
 
 function configure(opts: Partial<Configuration>): Configuration {
   const unknown = Object.keys(opts).filter((k) => !_validKeys.has(k));

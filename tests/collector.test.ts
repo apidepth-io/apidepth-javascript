@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   Collector,
   validateCollectorUrl,
@@ -223,5 +223,171 @@ describe("Collector flush failures", () => {
     }
 
     expect(c.stats().consecutiveFailures).toBe(FAILURE_THRESHOLD);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// JS-006: API key is re-validated at send time, not only in configure()
+// ---------------------------------------------------------------------------
+
+describe("Collector send-time API key validation (JS-006)", () => {
+  let originalRequest: typeof https.request;
+  let requestCalled: boolean;
+
+  beforeEach(() => {
+    originalRequest = https.request;
+    requestCalled = false;
+    (https as unknown as { request: typeof https.request }).request = (() => {
+      requestCalled = true;
+      return makeFailingRequest();
+    }) as unknown as typeof https.request;
+    setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+  });
+
+  afterEach(() => {
+    (https as unknown as { request: typeof https.request }).request = originalRequest;
+    setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+  });
+
+  it("rejects a header-injection key set directly on config and never sends", async () => {
+    // Bypass configure() — assign the key straight onto the singleton, the path
+    // that previously skipped validation entirely.
+    getConfiguration().apiKey = "key\ninjected";
+    const errors: Error[] = [];
+    getConfiguration().onFlushError = (err) => errors.push(err);
+
+    const c = Collector.getInstance();
+    c.record(makeEvent());
+    await c.flush();
+
+    expect(requestCalled).toBe(false); // no bytes ever hit the socket
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toMatch(/illegal characters/);
+    expect(c.stats().consecutiveFailures).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// JS-010: SIGTERM handler must not force-exit out from under the host app
+// ---------------------------------------------------------------------------
+
+describe("Collector no API key", () => {
+  let originalRequest: typeof https.request;
+  let requestCalled: boolean;
+
+  beforeEach(() => {
+    originalRequest = https.request;
+    requestCalled = false;
+    (https as unknown as { request: typeof https.request }).request = (() => {
+      requestCalled = true;
+      return makeFailingRequest();
+    }) as unknown as typeof https.request;
+  });
+
+  afterEach(() => {
+    (https as unknown as { request: typeof https.request }).request = originalRequest;
+    setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+  });
+
+  it("drops the batch and warns once when no API key is configured", async () => {
+    const warnings: string[] = [];
+    setLogger({ debug: () => {}, warn: (m) => warnings.push(String(m)), error: () => {} });
+    getConfiguration().apiKey = null;
+
+    const c = Collector.getInstance();
+    c.record(makeEvent());
+    await c.flush();
+    c.record(makeEvent());
+    await c.flush(); // second flush — warning must not repeat
+
+    expect(requestCalled).toBe(false);
+    expect(warnings.filter((w) => w.includes("No API key")).length).toBe(1);
+  });
+});
+
+describe("Collector non-2xx response", () => {
+  it("counts a non-2xx collector response as a flush failure", async () => {
+    getConfiguration().apiKey = "test-key";
+    setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+    const originalRequest = https.request;
+    (https as unknown as { request: typeof https.request }).request = function fake(
+      ...args: Parameters<typeof https.request>
+    ) {
+      const cb =
+        typeof args[1] === "function"
+          ? (args[1] as (r: unknown) => void)
+          : typeof args[2] === "function"
+            ? (args[2] as (r: unknown) => void)
+            : undefined;
+      const req = new EventEmitter() as ReturnType<typeof https.request>;
+      (req as unknown as { write: () => void; end: () => void }).write = () => {};
+      (req as unknown as { write: () => void; end: () => void }).end = () => {};
+      const res = new EventEmitter() as import("node:http").IncomingMessage;
+      (res as unknown as { statusCode: number; resume: () => void }).statusCode = 401;
+      (res as unknown as { statusCode: number; resume: () => void }).resume = () => {};
+      if (cb) req.once("response", cb);
+      process.nextTick(() => req.emit("response", res));
+      return req;
+    } as unknown as typeof https.request;
+
+    try {
+      const c = Collector.getInstance();
+      c.record(makeEvent());
+      await c.flush();
+      expect(c.stats().consecutiveFailures).toBe(1);
+    } finally {
+      (https as unknown as { request: typeof https.request }).request = originalRequest;
+      setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+    }
+  });
+});
+
+describe("Collector SIGTERM does not hijack shutdown (JS-010)", () => {
+  it("registers and removes its SIGTERM listener across getInstance/reset", () => {
+    const before = process.listenerCount("SIGTERM");
+    Collector.getInstance();
+    expect(process.listenerCount("SIGTERM")).toBe(before + 1);
+    Collector.reset();
+    expect(process.listenerCount("SIGTERM")).toBe(before);
+  });
+
+  it("flushes without calling process.exit when another SIGTERM listener exists", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const before = new Set(process.listeners("SIGTERM"));
+    Collector.getInstance();
+    const sdkHandler = process.listeners("SIGTERM").find((h) => !before.has(h)) as
+      | (() => void)
+      | undefined;
+    expect(sdkHandler).toBeDefined();
+
+    const appHandler = () => {};
+    process.on("SIGTERM", appHandler);
+    try {
+      sdkHandler!(); // invoke directly — does not raise a real signal
+      await new Promise((r) => setTimeout(r, 10));
+      expect(exitSpy).not.toHaveBeenCalled();
+    } finally {
+      process.off("SIGTERM", appHandler);
+      exitSpy.mockRestore();
+    }
+  });
+
+  it("force-exits after flushing when it is the sole SIGTERM listener", async () => {
+    // Temporarily make the SDK the only SIGTERM listener so the exit branch runs.
+    const saved = process.listeners("SIGTERM");
+    process.removeAllListeners("SIGTERM");
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    try {
+      Collector.getInstance(); // registers the only SIGTERM listener
+      const handlers = process.listeners("SIGTERM");
+      expect(handlers.length).toBe(1);
+      (handlers[0] as () => void)();
+      await new Promise((r) => setTimeout(r, 10));
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    } finally {
+      exitSpy.mockRestore();
+      process.removeAllListeners("SIGTERM");
+      for (const l of saved) process.on("SIGTERM", l as (...a: unknown[]) => void);
+    }
   });
 });

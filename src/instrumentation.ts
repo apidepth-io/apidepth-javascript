@@ -29,7 +29,11 @@ import { extractRateLimitHeaders } from "./rate_limit_headers.js";
 import { Collector } from "./collector.js";
 import { buildEvent, type Outcome } from "./event.js";
 import { isSkipped } from "./skip.js";
-import { isAiVendorHost, extractModelNameFromBody } from "./model_name_extractor.js";
+import {
+  isAiVendorHost,
+  extractModelNameFromBody,
+  MODEL_SCAN_MAX_BYTES,
+} from "./model_name_extractor.js";
 
 let _httpPatched = false;
 let _httpsPatched = false;
@@ -91,17 +95,16 @@ function _makeWrapper(originalFn: RequestFn): RequestFn {
         config.captureModelNames && isAiVendorHost(host) && ct.includes("application/json");
 
       if (captureModel) {
-        // Passively collect body chunks to extract model name.
-        // Attaching a 'data' listener puts the stream in flowing mode; all
-        // registered 'data' listeners (ours and the application's) receive
-        // the same chunks — neither side consumes the other's data.
+        // Passively collect body chunks to extract the model name. The original
+        // 8KB cap was raised to the model-scan bound so a `model` field that
+        // follows a large `data` array (embeddings) is still reachable (JS-003).
         let buffer = "";
         let capped = false;
 
         res.on("data", (chunk: Buffer | string) => {
           if (!capped) {
             buffer += typeof chunk === "string" ? chunk : chunk.toString("utf8");
-            if (buffer.length >= 8_192) capped = true;
+            if (buffer.length >= MODEL_SCAN_MAX_BYTES) capped = true;
           }
         });
 
@@ -152,10 +155,28 @@ function _makeWrapper(originalFn: RequestFn): RequestFn {
   } as RequestFn;
 }
 
+type GetFn = typeof http.get;
+
+// http.get / https.get capture the module-internal request() at definition
+// time, so reassigning the exported request() does not instrument them
+// (JS-009). Re-implement get on top of the patched request so one wrapper
+// covers both — this mirrors Node's own get: request(...args) then req.end().
+// mod.request is read at call time, so it resolves to the patched function.
+function _makeGetWrapper(mod: { request: (...args: unknown[]) => ClientRequest }): GetFn {
+  return function get(this: unknown, ...args: unknown[]): ClientRequest {
+    const req = mod.request(...args);
+    req.end();
+    return req;
+  } as unknown as GetFn;
+}
+
 function _patchNodeHttp(): void {
   if (_httpPatched) return;
   const original = http.request.bind(http);
   (http as { request: RequestFn }).request = _makeWrapper(original);
+  (http as { get: GetFn }).get = _makeGetWrapper(
+    http as unknown as { request: (...a: unknown[]) => ClientRequest }
+  );
   _httpPatched = true;
 }
 
@@ -163,6 +184,9 @@ function _patchNodeHttps(): void {
   if (_httpsPatched) return;
   const original = https.request.bind(https);
   (https as { request: RequestFn }).request = _makeWrapper(original as RequestFn);
+  (https as { get: GetFn }).get = _makeGetWrapper(
+    https as unknown as { request: (...a: unknown[]) => ClientRequest }
+  );
   _httpsPatched = true;
 }
 
@@ -423,7 +447,9 @@ function _extractRequestInfo(
 
 function _outcomeFromStatus(status: number): Outcome {
   if (status >= 200 && status <= 299) return "success";
-  if (status >= 300 && status <= 399) return "redirect";
+  // 3xx intentionally falls through to "unknown" — matches Ruby/Python and the
+  // collector's outcome enum (JS-007). Most clients auto-follow redirects, so
+  // the instrumented call usually observes the final 2xx anyway.
   if (status >= 400 && status <= 499) return "client_error";
   if (status >= 500 && status <= 599) return "server_error";
   return "unknown";

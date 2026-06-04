@@ -19,11 +19,21 @@ type CompiledPattern = [RegExp, string];
 // Canonical test cases live in apidepth-collector/tests/fixtures — all SDKs must pass them.
 const UNSAFE_RE = /\(\?[{<!=]|\(\?#|\+\?|\*\?\?/;
 
+// Generic fallbacks applied after vendor-specific patterns. Canonical across
+// all SDKs (XSDK-NORM) — see apidepth-collector/tests/fixtures/endpoint_cases.json.
+// The :token rule requires at least one digit (?=[a-z0-9]*\d) so 24+ char
+// readable slugs are left intact while opaque IDs/tokens — which effectively
+// always contain a digit — are collapsed. UUID is case-insensitive.
 const GENERIC_PATTERNS: CompiledPattern[] = [
   [/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "/:uuid"],
   [/\/\d{4,}/g, "/:id"],
-  [/\/[a-z0-9]{24,}/gi, "/:token"],
+  [/\/(?=[a-z0-9]*\d)[a-z0-9]{24,}/gi, "/:token"],
 ];
+
+// Upper bound on path length we run the generic normalizers against. Realistic
+// paths are well under 4 KB; above this we skip normalization because the
+// :token lookahead is O(n^2) worst-case on a long digit-free alnum run.
+const GENERIC_MAX_PATH = 4096;
 
 export const BUNDLED_BASELINE: RegistryJson = {
   version: "bundled",
@@ -125,6 +135,7 @@ function applyVendorNormalizers(rules: CompiledPattern[], path: string): string 
 }
 
 function applyGenericNormalizers(path: string): string {
+  if (path.length > GENERIC_MAX_PATH) return path;
   let p = path;
   for (const [re, replacement] of GENERIC_PATTERNS) p = p.replace(re, replacement);
   return p;

@@ -1,10 +1,6 @@
-export type Outcome =
-  | "success"
-  | "redirect"
-  | "client_error"
-  | "server_error"
-  | "timeout"
-  | "unknown";
+// Outcome taxonomy is shared across all SDKs (Ruby/Python/JS) and the collector.
+// 3xx responses map to "unknown" rather than a dedicated bucket — see JS-007.
+export type Outcome = "success" | "client_error" | "server_error" | "timeout" | "unknown";
 
 export interface ApidepthEvent {
   vendor: string;
