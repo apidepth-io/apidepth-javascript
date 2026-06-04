@@ -27,7 +27,7 @@ import { getConfiguration } from "./configuration.js";
 import { VendorRegistry } from "./vendor_registry.js";
 import { extractRateLimitHeaders } from "./rate_limit_headers.js";
 import { Collector } from "./collector.js";
-import { buildEvent, type Outcome } from "./event.js";
+import { buildEvent, type Outcome, type ApidepthEvent } from "./event.js";
 import { isSkipped } from "./skip.js";
 import {
   isAiVendorHost,
@@ -94,55 +94,42 @@ function _makeWrapper(originalFn: RequestFn): RequestFn {
       const captureModel =
         config.captureModelNames && isAiVendorHost(host) && ct.includes("application/json");
 
-      if (captureModel) {
-        // Passively collect body chunks to extract the model name. The original
-        // 8KB cap was raised to the model-scan bound so a `model` field that
-        // follows a large `data` array (embeddings) is still reachable (JS-003).
+      // Record the event immediately on the response so it is never lost if the
+      // body stalls or the socket is aborted before completing (JS-004).
+      // _recordSuccess returns the queued event so model_name can be backfilled.
+      const event = _recordSuccess({
+        host,
+        path,
+        method,
+        status: res.statusCode ?? 0,
+        headers: res.headers as Record<string, string | string[]>,
+        durationMs,
+        coldStart,
+      });
+
+      if (captureModel && event) {
+        // Observe the body by spying on res.push — the internal method the HTTP
+        // parser uses to feed the readable buffer — rather than attaching a 'data'
+        // listener (JS-001). This never switches the stream into flowing mode, so
+        // chunks are never stolen from a host consumer that attaches
+        // asynchronously; the host app's reads are completely unaffected. On EOF
+        // (push(null)) we extract the model name and backfill it onto the
+        // already-queued event. The cap was raised to the model-scan bound so a
+        // `model` field after a large `data` array (embeddings) is reachable (JS-003).
         let buffer = "";
         let capped = false;
-
-        res.on("data", (chunk: Buffer | string) => {
-          if (!capped) {
-            buffer += typeof chunk === "string" ? chunk : chunk.toString("utf8");
-            if (buffer.length >= MODEL_SCAN_MAX_BYTES) capped = true;
-          }
-        });
-
-        res.on("end", () => {
-          const modelName = extractModelNameFromBody(buffer) ?? undefined;
-          _recordSuccess({
-            host,
-            path,
-            method,
-            status: res.statusCode ?? 0,
-            headers: res.headers as Record<string, string | string[]>,
-            durationMs,
-            coldStart,
-            modelName,
-          });
-        });
-
-        res.on("error", () => {
-          _recordSuccess({
-            host,
-            path,
-            method,
-            status: res.statusCode ?? 0,
-            headers: res.headers as Record<string, string | string[]>,
-            durationMs,
-            coldStart,
-          });
-        });
-      } else {
-        _recordSuccess({
-          host,
-          path,
-          method,
-          status: res.statusCode ?? 0,
-          headers: res.headers as Record<string, string | string[]>,
-          durationMs,
-          coldStart,
-        });
+        const originalPush = res.push.bind(res);
+        (res as unknown as { push: (chunk: unknown, encoding?: BufferEncoding) => boolean }).push =
+          (chunk: unknown, encoding?: BufferEncoding): boolean => {
+            if (chunk == null) {
+              const modelName = extractModelNameFromBody(buffer);
+              if (modelName) event.model_name = modelName;
+            } else if (!capped) {
+              buffer += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
+              if (buffer.length >= MODEL_SCAN_MAX_BYTES) capped = true;
+            }
+            return originalPush(chunk as Buffer, encoding);
+          };
       }
     });
 
@@ -324,33 +311,36 @@ function _recordSuccess({
   durationMs,
   coldStart,
   modelName,
-}: SuccessArgs): void {
+}: SuccessArgs): ApidepthEvent | null {
   try {
     const result = VendorRegistry.identify(host, path);
-    if (!result) return;
+    if (!result) return null;
     const [vendor, endpoint] = result;
 
     const outcome = _outcomeFromStatus(status);
     const nowMs = Date.now();
     const rl = extractRateLimitHeaders(headers as Record<string, string>, nowMs);
 
-    Collector.getInstance().record(
-      buildEvent({
-        vendor,
-        endpoint,
-        method,
-        status,
-        outcome,
-        duration_ms: durationMs,
-        cold_start: coldStart,
-        env: _resolveEnv(),
-        ts: nowMs,
-        ...(rl ?? {}),
-        ...(modelName ? { model_name: modelName } : {}),
-      })
-    );
+    // record() queues this exact object reference, so callers can backfill
+    // optional fields (e.g. model_name) onto the returned event afterwards.
+    const event = buildEvent({
+      vendor,
+      endpoint,
+      method,
+      status,
+      outcome,
+      duration_ms: durationMs,
+      cold_start: coldStart,
+      env: _resolveEnv(),
+      ts: nowMs,
+      ...(rl ?? {}),
+      ...(modelName ? { model_name: modelName } : {}),
+    });
+    Collector.getInstance().record(event);
+    return event;
   } catch {
     // instrumentation must never crash the caller
+    return null;
   }
 }
 
