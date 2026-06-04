@@ -23,6 +23,6 @@ export default [
   },
   prettier,
   {
-    ignores: ["dist/**", "node_modules/**", "examples/**"],
+    ignores: ["dist/**", "node_modules/**", "examples/**", "coverage/**"],
   },
 ];
