@@ -735,4 +735,24 @@ describe("instrumentation covers http.get / https.get (JS-009)", () => {
     (https as { request: typeof https.request }).request = originalRequest;
     (https as { get: typeof https.get }).get = originalGet;
   });
+
+  it("records an event for a direct http.get call", async () => {
+    getConfiguration().apiKey = "test-key";
+    const originalRequest = http.request;
+    const originalGet = http.get;
+
+    (http as { request: typeof http.request }).request = vi.fn(() =>
+      makeFakeRequest({ statusCode: 200 })
+    ) as unknown as typeof http.request;
+
+    instrument();
+
+    http.get({ hostname: "api.stripe.com", path: "/v1/charges", method: "GET" });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+
+    (http as { request: typeof http.request }).request = originalRequest;
+    (http as { get: typeof http.get }).get = originalGet;
+  });
 });

@@ -271,6 +271,77 @@ describe("Collector send-time API key validation (JS-006)", () => {
 // JS-010: SIGTERM handler must not force-exit out from under the host app
 // ---------------------------------------------------------------------------
 
+describe("Collector no API key", () => {
+  let originalRequest: typeof https.request;
+  let requestCalled: boolean;
+
+  beforeEach(() => {
+    originalRequest = https.request;
+    requestCalled = false;
+    (https as unknown as { request: typeof https.request }).request = (() => {
+      requestCalled = true;
+      return makeFailingRequest();
+    }) as unknown as typeof https.request;
+  });
+
+  afterEach(() => {
+    (https as unknown as { request: typeof https.request }).request = originalRequest;
+    setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+  });
+
+  it("drops the batch and warns once when no API key is configured", async () => {
+    const warnings: string[] = [];
+    setLogger({ debug: () => {}, warn: (m) => warnings.push(String(m)), error: () => {} });
+    getConfiguration().apiKey = null;
+
+    const c = Collector.getInstance();
+    c.record(makeEvent());
+    await c.flush();
+    c.record(makeEvent());
+    await c.flush(); // second flush — warning must not repeat
+
+    expect(requestCalled).toBe(false);
+    expect(warnings.filter((w) => w.includes("No API key")).length).toBe(1);
+  });
+});
+
+describe("Collector non-2xx response", () => {
+  it("counts a non-2xx collector response as a flush failure", async () => {
+    getConfiguration().apiKey = "test-key";
+    setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+    const originalRequest = https.request;
+    (https as unknown as { request: typeof https.request }).request = function fake(
+      ...args: Parameters<typeof https.request>
+    ) {
+      const cb =
+        typeof args[1] === "function"
+          ? (args[1] as (r: unknown) => void)
+          : typeof args[2] === "function"
+            ? (args[2] as (r: unknown) => void)
+            : undefined;
+      const req = new EventEmitter() as ReturnType<typeof https.request>;
+      (req as unknown as { write: () => void; end: () => void }).write = () => {};
+      (req as unknown as { write: () => void; end: () => void }).end = () => {};
+      const res = new EventEmitter() as import("node:http").IncomingMessage;
+      (res as unknown as { statusCode: number; resume: () => void }).statusCode = 401;
+      (res as unknown as { statusCode: number; resume: () => void }).resume = () => {};
+      if (cb) req.once("response", cb);
+      process.nextTick(() => req.emit("response", res));
+      return req;
+    } as unknown as typeof https.request;
+
+    try {
+      const c = Collector.getInstance();
+      c.record(makeEvent());
+      await c.flush();
+      expect(c.stats().consecutiveFailures).toBe(1);
+    } finally {
+      (https as unknown as { request: typeof https.request }).request = originalRequest;
+      setLogger({ debug: () => {}, warn: () => {}, error: () => {} });
+    }
+  });
+});
+
 describe("Collector SIGTERM does not hijack shutdown (JS-010)", () => {
   it("registers and removes its SIGTERM listener across getInstance/reset", () => {
     const before = process.listenerCount("SIGTERM");
@@ -298,6 +369,25 @@ describe("Collector SIGTERM does not hijack shutdown (JS-010)", () => {
     } finally {
       process.off("SIGTERM", appHandler);
       exitSpy.mockRestore();
+    }
+  });
+
+  it("force-exits after flushing when it is the sole SIGTERM listener", async () => {
+    // Temporarily make the SDK the only SIGTERM listener so the exit branch runs.
+    const saved = process.listeners("SIGTERM");
+    process.removeAllListeners("SIGTERM");
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    try {
+      Collector.getInstance(); // registers the only SIGTERM listener
+      const handlers = process.listeners("SIGTERM");
+      expect(handlers.length).toBe(1);
+      (handlers[0] as () => void)();
+      await new Promise((r) => setTimeout(r, 10));
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    } finally {
+      exitSpy.mockRestore();
+      process.removeAllListeners("SIGTERM");
+      for (const l of saved) process.on("SIGTERM", l as (...a: unknown[]) => void);
     }
   });
 });
