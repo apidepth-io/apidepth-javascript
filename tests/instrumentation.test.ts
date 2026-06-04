@@ -6,6 +6,7 @@ import { instrument, resetInstrumentation } from "../src/instrumentation.js";
 import https from "node:https";
 import http from "node:http";
 import { EventEmitter } from "node:events";
+import { Readable } from "node:stream";
 
 beforeEach(() => {
   Collector.reset();
@@ -21,7 +22,6 @@ function makeFakeRequest(opts: {
   socketConnecting?: boolean;
   errorAfterMs?: number;
   responseBody?: string;
-  responseEmitError?: boolean;
 }) {
   const req = new EventEmitter() as ReturnType<typeof https.request>;
   (req as unknown as { end: () => void }).end = () => {};
@@ -38,20 +38,18 @@ function makeFakeRequest(opts: {
     (socket as unknown as { connecting: boolean }).connecting = opts.socketConnecting ?? false;
     req.emit("socket", socket);
 
-    const res = new EventEmitter() as import("node:http").IncomingMessage;
+    // A real Readable so res.push exists and feeds the readable buffer the way
+    // Node's HTTP parser does — the SDK observes the body through its push spy.
+    const res = new Readable({ read() {} }) as unknown as import("node:http").IncomingMessage;
     (res as unknown as { statusCode: number }).statusCode = opts.statusCode ?? 200;
     (res as unknown as { headers: Record<string, string> }).headers = opts.headers ?? {};
     req.emit("response", res);
 
-    // Emit body events after the response handlers have been registered
+    // Deliver the body via res.push after the response handler is registered.
     if (opts.responseBody !== undefined) {
       process.nextTick(() => {
-        res.emit("data", Buffer.from(opts.responseBody!));
-        res.emit("end");
-      });
-    } else if (opts.responseEmitError) {
-      process.nextTick(() => {
-        res.emit("error", new Error("response stream error"));
+        (res as unknown as Readable).push(Buffer.from(opts.responseBody!));
+        (res as unknown as Readable).push(null);
       });
     }
   });
@@ -485,149 +483,107 @@ describe("instrumentation sample rate", () => {
 // Model name extraction — HTTP path (captureModel = true)
 // ---------------------------------------------------------------------------
 
-describe("instrumentation model name extraction via HTTP", () => {
-  it("records model_name from JSON response body for an AI vendor host", async () => {
+describe("instrumentation model name extraction via HTTP (JS-001 / JS-004)", () => {
+  // Drive an AI-vendor JSON request through the instrumented https.request and
+  // return the recorded event after the body has been delivered/backfilled.
+  async function recordWith(body: string | undefined, host = "api.openai.com") {
     getConfiguration().apiKey = "test-key";
     const originalRequest = https.request;
-
     (https as { request: typeof https.request }).request = vi.fn(() =>
       makeFakeRequest({
         statusCode: 200,
         headers: { "content-type": "application/json" },
-        responseBody: '{"model":"gpt-4-turbo","choices":[]}',
+        responseBody: body,
       })
     ) as unknown as typeof https.request;
 
     instrument();
-
-    const req = https.request({
-      hostname: "api.openai.com",
-      path: "/v1/chat/completions",
-      method: "POST",
-    });
+    const recordSpy = vi.spyOn(Collector.getInstance(), "record");
+    const req = https.request({ hostname: host, path: "/v1/chat/completions", method: "POST" });
     req.end();
-
-    await new Promise((r) => setTimeout(r, 100));
-    expect(Collector.getInstance().stats().queueSize).toBe(1);
-
+    await new Promise((r) => setTimeout(r, 50));
     (https as { request: typeof https.request }).request = originalRequest;
+    return recordSpy.mock.calls[0]?.[0];
+  }
+
+  it("backfills model_name from a JSON body via the push spy", async () => {
+    const event = await recordWith('{"model":"gpt-4-turbo","choices":[]}');
+    expect(event?.vendor).toBe("openai");
+    expect(event?.model_name).toBe("gpt-4-turbo");
   });
 
-  it("records event and recovers when response stream emits an error while capturing model", async () => {
+  it("handles a string data chunk", async () => {
+    const event = await recordWith('{"model":"claude-3-opus"}', "api.anthropic.com");
+    expect(event?.model_name).toBe("claude-3-opus");
+  });
+
+  it("captures a model field that follows a large data array (>8KB)", async () => {
+    const body =
+      '{"object":"list","data":["' + "x".repeat(20_000) + '"],"model":"text-embedding-3-small"}';
+    const event = await recordWith(body);
+    expect(event?.model_name).toBe("text-embedding-3-small");
+  });
+
+  it("records the event immediately even if the body never completes (JS-004)", async () => {
+    // No body is delivered — the event must still be recorded on 'response'.
+    const event = await recordWith(undefined);
+    expect(event?.vendor).toBe("openai");
+    expect(event?.model_name).toBeUndefined();
+    expect(Collector.getInstance().stats().queueSize).toBe(1);
+  });
+
+  it("does not steal the body from an async host consumer (JS-001)", async () => {
     getConfiguration().apiKey = "test-key";
     const originalRequest = https.request;
 
-    (https as { request: typeof https.request }).request = vi.fn(() =>
-      makeFakeRequest({
-        statusCode: 200,
-        headers: { "content-type": "application/json" },
-        responseEmitError: true,
-      })
-    ) as unknown as typeof https.request;
+    const res = new Readable({ read() {} }) as unknown as import("node:http").IncomingMessage;
+    (res as unknown as { statusCode: number }).statusCode = 200;
+    (res as unknown as { headers: Record<string, string> }).headers = {
+      "content-type": "application/json",
+    };
+    const req = new EventEmitter() as ReturnType<typeof https.request>;
+    (req as unknown as { end: () => void }).end = () => {};
 
-    instrument();
-
-    const req = https.request({
-      hostname: "api.openai.com",
-      path: "/v1/chat/completions",
-      method: "POST",
-    });
-    req.end();
-
-    await new Promise((r) => setTimeout(r, 100));
-    expect(Collector.getInstance().stats().queueSize).toBe(1);
-
-    (https as { request: typeof https.request }).request = originalRequest;
-  });
-
-  it("handles a string data chunk in the response body buffer", async () => {
-    getConfiguration().apiKey = "test-key";
-    const originalRequest = https.request;
-
-    // Emit a string chunk (not a Buffer) to cover the typeof chunk === "string" branch
     (https as { request: typeof https.request }).request = vi.fn(() => {
-      const req = new EventEmitter() as ReturnType<typeof https.request>;
-      (req as unknown as { end: () => void }).end = () => {};
       process.nextTick(() => {
         const socket = new EventEmitter() as NodeJS.Socket;
         (socket as unknown as { connecting: boolean }).connecting = false;
         req.emit("socket", socket);
-
-        const res = new EventEmitter() as import("node:http").IncomingMessage;
-        (res as unknown as { statusCode: number }).statusCode = 200;
-        (res as unknown as { headers: Record<string, string> }).headers = {
-          "content-type": "application/json",
-        };
         req.emit("response", res);
-
-        process.nextTick(() => {
-          res.emit("data", '{"model":"claude-3-opus"}');
-          res.emit("end");
-        });
+        // Body delivered BEFORE the host attaches a consumer. With a 'data'
+        // listener this would flow and be lost; the push spy leaves it buffered.
+        const body = JSON.stringify({ model: "gpt-4o-mini", choices: [] });
+        (res as unknown as Readable).push(Buffer.from(body));
+        (res as unknown as Readable).push(null);
       });
       return req;
     }) as unknown as typeof https.request;
 
     instrument();
-
-    const req = https.request({
-      hostname: "api.anthropic.com",
-      path: "/v1/messages",
-      method: "POST",
-    });
-    req.end();
-
-    await new Promise((r) => setTimeout(r, 100));
-    expect(Collector.getInstance().stats().queueSize).toBe(1);
-
-    (https as { request: typeof https.request }).request = originalRequest;
-  });
-
-  it("caps buffer and still records event when response body exceeds 8 KB", async () => {
-    getConfiguration().apiKey = "test-key";
-    const originalRequest = https.request;
-
-    const largeChunk = "x".repeat(9_000);
-
-    (https as { request: typeof https.request }).request = vi.fn(() => {
-      const req = new EventEmitter() as ReturnType<typeof https.request>;
-      (req as unknown as { end: () => void }).end = () => {};
-      process.nextTick(() => {
-        const socket = new EventEmitter() as NodeJS.Socket;
-        (socket as unknown as { connecting: boolean }).connecting = false;
-        req.emit("socket", socket);
-
-        const res = new EventEmitter() as import("node:http").IncomingMessage;
-        (res as unknown as { statusCode: number }).statusCode = 200;
-        (res as unknown as { headers: Record<string, string> }).headers = {
-          "content-type": "application/json",
-        };
-        req.emit("response", res);
-
-        process.nextTick(() => {
-          // First chunk pushes buffer past 8 KB, setting capped = true
-          res.emit("data", Buffer.from(largeChunk));
-          // Second chunk should be ignored (capped)
-          res.emit("data", Buffer.from('{"model":"late-model"}'));
-          res.emit("end");
-        });
-      });
-      return req;
-    }) as unknown as typeof https.request;
-
-    instrument();
-
-    const req = https.request({
+    const recordSpy = vi.spyOn(Collector.getInstance(), "record");
+    const request = https.request({
       hostname: "api.openai.com",
       path: "/v1/chat/completions",
       method: "POST",
     });
-    req.end();
+    request.end();
 
-    await new Promise((r) => setTimeout(r, 100));
-    // Event is still recorded even if body parsing found no model
-    expect(Collector.getInstance().stats().queueSize).toBe(1);
+    // Host consumer attaches late, after the response + body have arrived.
+    const hostBody: string = await new Promise((resolve) => {
+      setTimeout(() => {
+        const chunks: Buffer[] = [];
+        (res as unknown as Readable).on("data", (c: Buffer) => chunks.push(c));
+        (res as unknown as Readable).on("end", () =>
+          resolve(Buffer.concat(chunks).toString("utf8"))
+        );
+      }, 10);
+    });
 
+    expect(JSON.parse(hostBody).model).toBe("gpt-4o-mini"); // host received the full body
+    await new Promise((r) => setTimeout(r, 10));
+    expect(recordSpy.mock.calls[0][0].model_name).toBe("gpt-4o-mini"); // SDK captured it too
+
+    recordSpy.mockRestore();
     (https as { request: typeof https.request }).request = originalRequest;
   });
 });
