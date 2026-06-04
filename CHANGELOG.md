@@ -7,6 +7,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.3.2](https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.3.1...apidepth-v0.3.2) (2026-06-04)
+
+
+### Bug Fixes
+
+* config validation, key-injection guard, http.get coverage, model extraction, normalization ([#37](https://github.com/apidepth-io/apidepth-javascript/issues/37)) ([a0a2797](https://github.com/apidepth-io/apidepth-javascript/commit/a0a2797db894f934854a057f32a8204c611b5356))
+* correct OIDC audience to https://registry.npmjs.org ([#33](https://github.com/apidepth-io/apidepth-javascript/issues/33)) ([6c617e3](https://github.com/apidepth-io/apidepth-javascript/commit/6c617e395cbbc80ba23b68733d2ae8978a97248e))
+* drop registry-url so OIDC trusted publisher exchange works ([#30](https://github.com/apidepth-io/apidepth-javascript/issues/30)) ([a2b0e4a](https://github.com/apidepth-io/apidepth-javascript/commit/a2b0e4a6ad4bf0a8e6c816b004a4b1835510c915))
+* explicitly exchange OIDC token for npm Trusted Publisher auth ([#32](https://github.com/apidepth-io/apidepth-javascript/issues/32)) ([2461150](https://github.com/apidepth-io/apidepth-javascript/commit/246115044d97e061a9e3b24ed53f4840c17a459f))
+* let npm handle OIDC exchange natively for Trusted Publisher ([#34](https://github.com/apidepth-io/apidepth-javascript/issues/34)) ([755ad9e](https://github.com/apidepth-io/apidepth-javascript/commit/755ad9e4d1fc354049195e179e4fb56a0fb65aa7))
+* observe response body via res.push spy, record on response (JS-001/JS-004) ([#38](https://github.com/apidepth-io/apidepth-javascript/issues/38)) ([ea004b6](https://github.com/apidepth-io/apidepth-javascript/commit/ea004b6621d621cda420887901128f1f64331ba6))
+* upgrade to npm 11.x for built-in OIDC Trusted Publisher support ([#36](https://github.com/apidepth-io/apidepth-javascript/issues/36)) ([20bfa73](https://github.com/apidepth-io/apidepth-javascript/commit/20bfa7347f8d88547d2653bb909ddfe1cb961b92))
+* use npm login --auth-type=oidc for Trusted Publisher exchange ([#35](https://github.com/apidepth-io/apidepth-javascript/issues/35)) ([ba48d6a](https://github.com/apidepth-io/apidepth-javascript/commit/ba48d6ab89c764b2b080161ad800f39176224bfe))
+
 ## [0.3.1](https://github.com/apidepth-io/apidepth-javascript/compare/apidepth-v0.3.0...apidepth-v0.3.1) (2026-06-03)
 
 ### Bug Fixes
