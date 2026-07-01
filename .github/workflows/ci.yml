@@ -16,14 +16,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Shared parity fixtures (tests/ssrf.test.ts, tests/endpoint_cases.test.ts).
       # continue-on-error so a missing GH_PAT secret never reds the build — those
       # tests skip gracefully when the fixtures are absent.
       - name: Checkout collector (test fixtures)
         continue-on-error: true
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: apidepth-io/apidepth-collector
           token: ${{ secrets.GH_PAT }}
@@ -74,10 +74,10 @@ jobs:
       RESEND_API_KEY: re_test_placeholder
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Checkout collector
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: apidepth-io/apidepth-collector
           token: ${{ secrets.GH_PAT }}
