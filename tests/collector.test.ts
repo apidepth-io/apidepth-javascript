@@ -356,8 +356,7 @@ describe("Collector SIGTERM does not hijack shutdown (JS-010)", () => {
     const before = new Set(process.listeners("SIGTERM"));
     Collector.getInstance();
     const sdkHandler = process.listeners("SIGTERM").find((h) => !before.has(h)) as
-      | (() => void)
-      | undefined;
+      (() => void) | undefined;
     expect(sdkHandler).toBeDefined();
 
     const appHandler = () => {};
